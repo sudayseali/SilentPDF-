@@ -131,19 +131,32 @@ class PdfRepository(
             Log.e("PdfRepository", "Error scanning MediaStore PDFs", e)
         }
 
-        // Merge newly scanned items with database
+        // Merge newly scanned items with database efficiently
+        val existingPdfs = try { pdfDao.getAllPdfsSync() } catch (e: Exception) { emptyList() }
+        val existingMap = existingPdfs.associateBy { it.uriString }
+        val pdfsToInsert = mutableListOf<PdfEntity>()
+
         pdfList.forEach { scannedPdf ->
-            val existing = pdfDao.getPdfByUri(scannedPdf.uriString)
+            val existing = existingMap[scannedPdf.uriString]
             if (existing == null) {
-                pdfDao.insertOrUpdatePdf(scannedPdf)
-            } else {
-                pdfDao.insertOrUpdatePdf(existing.copy(
+                pdfsToInsert.add(scannedPdf)
+            } else if (existing.fileName != scannedPdf.fileName || existing.fileSize != scannedPdf.fileSize) {
+                pdfsToInsert.add(existing.copy(
                     fileName = scannedPdf.fileName,
                     fileSize = scannedPdf.fileSize,
                     filePath = scannedPdf.filePath
                 ))
             }
         }
+        
+        if (pdfsToInsert.isNotEmpty()) {
+            try {
+                pdfDao.insertOrUpdatePdfs(pdfsToInsert)
+            } catch (e: Exception) {
+                Log.e("PdfRepository", "Error batch inserting PDFs", e)
+            }
+        }
+        
         return@withContext pdfList
     }
 }

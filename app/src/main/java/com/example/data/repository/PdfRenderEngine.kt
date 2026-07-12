@@ -18,8 +18,9 @@ class PdfRenderEngine(private val context: Context) {
     private var currentUri: Uri? = null
 
     // Cache of page bitmaps to avoid redundant rendering
-    // Uses an LRU-like cache with max 3 active bitmaps to save RAM
-    private val bitmapCache = mutableMapOf<Int, Bitmap>()
+    // Uses an LRU cache with max 3 active bitmaps to save RAM
+    // Do NOT manually call recycle() when evicting because Compose UI might still be drawing them. Let GC handle it.
+    private val bitmapCache = object : android.util.LruCache<Int, Bitmap>(3) {}
 
     suspend fun openDocument(uri: Uri): Int = withContext(Dispatchers.IO) {
         closeDocument()
@@ -59,22 +60,12 @@ class PdfRenderEngine(private val context: Context) {
         val count = renderer.pageCount
         if (pageIndex < 0 || pageIndex >= count) return@withContext null
 
-        val cached = bitmapCache[pageIndex]
+        val cached = bitmapCache.get(pageIndex)
         if (cached != null && !cached.isRecycled) {
             return@withContext cached
         }
 
         try {
-            // Keep memory low: Evict older bitmaps if cache size exceeds 3
-            if (bitmapCache.size >= 3) {
-                val toRemove = bitmapCache.keys.firstOrNull { it != pageIndex }
-                toRemove?.let { idx ->
-                    val oldBitmap = bitmapCache.remove(idx)
-                    if (oldBitmap != null && !oldBitmap.isRecycled) {
-                        oldBitmap.recycle()
-                    }
-                }
-            }
 
             val page = renderer.openPage(pageIndex)
             val originalWidth = page.width
@@ -97,12 +88,25 @@ class PdfRenderEngine(private val context: Context) {
             val renderWidth = (originalWidth * finalScale).toInt().coerceAtLeast(100)
             val renderHeight = (originalHeight * finalScale).toInt().coerceAtLeast(100)
 
-            val bitmap = Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+            val bitmap = try {
+                Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+            } catch (e: OutOfMemoryError) {
+                Log.e("PdfRenderEngine", "OOM when creating bitmap for page $pageIndex", e)
+                System.gc() // Hint GC
+                // Fallback to smaller bitmap to save memory
+                val smallerWidth = (renderWidth / 2).coerceAtLeast(100)
+                val smallerHeight = (renderHeight / 2).coerceAtLeast(100)
+                Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888)
+            }
+
             page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
             page.close()
 
-            bitmapCache[pageIndex] = bitmap
+            bitmapCache.put(pageIndex, bitmap)
             return@withContext bitmap
+        } catch (e: OutOfMemoryError) {
+            Log.e("PdfRenderEngine", "OOM during renderPage $pageIndex", e)
+            return@withContext null
         } catch (e: Exception) {
             Log.e("PdfRenderEngine", "Failed to render page $pageIndex", e)
             return@withContext null
@@ -110,12 +114,7 @@ class PdfRenderEngine(private val context: Context) {
     }
 
     fun closeDocument() {
-        bitmapCache.forEach { (_, bitmap) ->
-            if (!bitmap.isRecycled) {
-                bitmap.recycle()
-            }
-        }
-        bitmapCache.clear()
+        bitmapCache.evictAll()
 
         try {
             pdfRenderer?.close()

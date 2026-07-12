@@ -20,8 +20,14 @@ interface SilentPdfDao {
     @Query("SELECT * FROM pdfs WHERE uriString = :uriString LIMIT 1")
     suspend fun getPdfByUri(uriString: String): PdfEntity?
 
+    @Query("SELECT * FROM pdfs")
+    suspend fun getAllPdfsSync(): List<PdfEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdatePdf(pdf: PdfEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdatePdfs(pdfs: List<PdfEntity>)
 
     @Query("UPDATE pdfs SET lastPageRead = :page, lastAccessTime = :time WHERE uriString = :uriString")
     suspend fun updateProgress(uriString: String, page: Int, time: Long)
