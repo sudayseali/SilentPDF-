@@ -1,0 +1,6 @@
+{
+  "name": "SilentPDF",
+  "description": "A 100% offline, high-performance local PDF reader with support for True Dark Mode and smooth rendering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
