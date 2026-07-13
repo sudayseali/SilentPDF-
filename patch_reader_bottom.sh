@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/ui/screens/ReaderScreen.kt
 package com.example.ui.screens
 
 import android.graphics.Bitmap
@@ -526,7 +527,7 @@ fun ReaderScreen(
                                 val pdfUri = currentPdf?.uriString ?: return@Canvas
                                 val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
                                 
-                                val drawStroke = { stroke: DrawingStroke ->
+                                val drawStroke: androidx.compose.ui.graphics.drawscope.DrawScope.(DrawingStroke) -> Unit = { stroke ->
                                     if (stroke.points.size > 1) {
                                         val path = androidx.compose.ui.graphics.Path().apply {
                                             moveTo(stroke.points.first().x, stroke.points.first().y)
@@ -547,8 +548,8 @@ fun ReaderScreen(
                                     }
                                 }
 
-                                strokes.forEach(drawStroke)
-                                currentStroke?.let(drawStroke)
+                                strokes.forEach { it.drawStroke() }
+                                currentStroke?.let { it.drawStroke() }
                             }
                         }
                     }
@@ -559,3 +560,4 @@ fun ReaderScreen(
         }
     }
 }
+INNER_EOF

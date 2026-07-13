@@ -1,3 +1,4 @@
+cat << 'INNER_EOF' > app/src/main/java/com/example/ui/screens/ReaderScreen.kt
 package com.example.ui.screens
 
 import android.graphics.Bitmap
@@ -30,8 +31,6 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -68,20 +67,8 @@ fun ReaderScreen(
     var viewWidth by remember { mutableStateOf(1080) }
 
     var isDrawingMode by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color(0xFFF44336)) } // Default Red
-    var strokeWidth by remember { mutableStateOf(8f) }
-    var isEraserMode by remember { mutableStateOf(false) }
-    
-    val colors = listOf(
-        Color(0xFFF44336), // Red
-        Color(0xFF2196F3), // Blue
-        Color(0xFF4CAF50), // Green
-        Color(0xFFFFEB3B), // Yellow
-        Color(0xFFFF9800), // Orange
-        Color(0xFF9C27B0), // Purple
-        Color(0xFF000000), // Black
-        Color(0xFFFFFFFF)  // White
-    )
+    var selectedColor by remember { mutableStateOf(Color.Red) }
+    val colors = listOf(Color.Red, Color.Blue, Color.Green, Color.Black, Color.Yellow, Color.White)
     var currentStroke by remember { mutableStateOf<DrawingStroke?>(null) }
 
     val invertColorMatrix = remember {
@@ -189,6 +176,36 @@ fun ReaderScreen(
                         }
                     },
                     actions = {
+                        if (isDrawingMode) {
+                            IconButton(onClick = { 
+                                currentPdf?.uriString?.let { uri ->
+                                    viewModel.undoLastStroke(uri, currentPage)
+                                }
+                            }) {
+                                Icon(Icons.Default.Undo, contentDescription = "Undo")
+                            }
+                            var showColorMenu by remember { mutableStateOf(false) }
+                            Box {
+                                IconButton(onClick = { showColorMenu = true }) {
+                                    Icon(Icons.Default.Palette, contentDescription = "Color", tint = selectedColor)
+                                }
+                                DropdownMenu(expanded = showColorMenu, onDismissRequest = { showColorMenu = false }) {
+                                    colors.forEach { color ->
+                                        DropdownMenuItem(
+                                            text = { Text("Pick Color") },
+                                            leadingIcon = {
+                                                Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color).border(1.dp, Color.Gray, CircleShape))
+                                            },
+                                            onClick = {
+                                                selectedColor = color
+                                                showColorMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
                         IconButton(onClick = { isDrawingMode = !isDrawingMode }) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
@@ -222,102 +239,9 @@ fun ReaderScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        if (isDrawingMode) {
-                            // Drawing Toolbar
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    IconButton(
-                                        onClick = { isEraserMode = false },
-                                        modifier = Modifier.background(
-                                            color = if (!isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Brush,
-                                            contentDescription = "Pen",
-                                            tint = if (!isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { isEraserMode = true },
-                                        modifier = Modifier.background(
-                                            color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Default.AutoFixHigh,
-                                            contentDescription = "Eraser",
-                                            tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                                
-                                var showColorMenu by remember { mutableStateOf(false) }
-                                Box {
-                                    IconButton(
-                                        onClick = { showColorMenu = true },
-                                        enabled = !isEraserMode
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Palette, 
-                                            contentDescription = "Color", 
-                                            tint = if (isEraserMode) Color.Gray else selectedColor
-                                        )
-                                    }
-                                    DropdownMenu(expanded = showColorMenu, onDismissRequest = { showColorMenu = false }) {
-                                        colors.forEach { color ->
-                                            DropdownMenuItem(
-                                                text = { Text("Select") },
-                                                leadingIcon = {
-                                                    Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color).border(1.dp, Color.Gray, CircleShape))
-                                                },
-                                                onClick = {
-                                                    selectedColor = color
-                                                    showColorMenu = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    IconButton(onClick = { 
-                                        currentPdf?.uriString?.let { uri ->
-                                            viewModel.undoLastStroke(uri, currentPage)
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.Undo, contentDescription = "Undo")
-                                    }
-                                }
-                            }
-                            
-                            // Stroke width slider
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.LineWeight, contentDescription = "Thickness", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Slider(
-                                    value = strokeWidth,
-                                    onValueChange = { strokeWidth = it },
-                                    valueRange = 2f..40f,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        }
-
-                        // Navigation Controls
                         if (pageCount > 1) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -445,117 +369,134 @@ fun ReaderScreen(
             ) {
                 if (isPdfLoading) {
                     CircularProgressIndicator()
-                } else if (pageBitmap != null) {
-                    val bitmap = pageBitmap!!
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(isDrawingMode) {
-                                if (isDrawingMode) {
-                                    detectDragGestures(
-                                        onDragStart = { startOffset ->
-                                            val centerX = size.width / 2f
-                                            val centerY = size.height / 2f
-                                            val unscaledX = (startOffset.x - offset.x - centerX) / scale + centerX
-                                            val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
-                                            currentStroke = DrawingStroke(
-                                                points = listOf(Offset(unscaledX, unscaledY)),
-                                                color = selectedColor,
-                                                width = strokeWidth / scale,
-                                                isEraser = isEraserMode
-                                            )
-                                        },
-                                        onDrag = { change, _ ->
-                                            val centerX = size.width / 2f
-                                            val centerY = size.height / 2f
-                                            val unscaledX = (change.position.x - offset.x - centerX) / scale + centerX
-                                            val unscaledY = (change.position.y - offset.y - centerY) / scale + centerY
-                                            currentStroke = currentStroke?.copy(
-                                                points = currentStroke!!.points + Offset(unscaledX, unscaledY)
-                                            )
-                                        },
-                                        onDragEnd = {
-                                            currentStroke?.let { stroke ->
-                                                if (stroke.points.size > 1) {
-                                                    currentPdf?.uriString?.let { uri ->
-                                                        viewModel.addStroke(uri, currentPage, stroke)
+                } else {
+                    pageBitmap?.let { bitmap ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(isDrawingMode) {
+                                    if (isDrawingMode) {
+                                        detectDragGestures(
+                                            onDragStart = { startOffset ->
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                val unscaledX = (startOffset.x - offset.x - centerX) / scale + centerX
+                                                val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
+                                                currentStroke = DrawingStroke(
+                                                    points = listOf(Offset(unscaledX, unscaledY)),
+                                                    color = selectedColor,
+                                                    width = 8f / scale
+                                                )
+                                            },
+                                            onDrag = { change, _ ->
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                val unscaledX = (change.position.x - offset.x - centerX) / scale + centerX
+                                                val unscaledY = (change.position.y - offset.y - centerY) / scale + centerY
+                                                currentStroke = currentStroke?.copy(
+                                                    points = currentStroke!!.points + Offset(unscaledX, unscaledY)
+                                                )
+                                            },
+                                            onDragEnd = {
+                                                currentStroke?.let { stroke ->
+                                                    if (stroke.points.size > 1) {
+                                                        currentPdf?.uriString?.let { uri ->
+                                                            viewModel.addStroke(uri, currentPage, stroke)
+                                                        }
                                                     }
                                                 }
+                                                currentStroke = null
+                                            },
+                                            onDragCancel = {
+                                                currentStroke = null
                                             }
-                                            currentStroke = null
-                                        },
-                                        onDragCancel = {
-                                            currentStroke = null
-                                        }
-                                    )
-                                } else {
-                                    detectTransformGestures { _, pan, zoom, _ ->
-                                        scale = (scale * zoom).coerceIn(1f, 4f)
-                                        if (scale > 1f) {
-                                            offset = Offset(
-                                                x = offset.x + pan.x,
-                                                y = offset.y + pan.y
-                                            )
-                                        } else {
-                                            offset = Offset.Zero
-                                        }
-                                    }
-                                }
-                            }
-                    ) {
-                        val layerModifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                translationX = offset.x
-                                translationY = offset.y
-                                // Need compositing strategy offscreen for BlendMode.Clear to work on this layer ONLY
-                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                            }
-
-                        Box(modifier = layerModifier) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "PDF Page",
-                                colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val pdfUri = currentPdf?.uriString ?: return@Canvas
-                                val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
-                                
-                                val drawStroke = { stroke: DrawingStroke ->
-                                    if (stroke.points.size > 1) {
-                                        val path = androidx.compose.ui.graphics.Path().apply {
-                                            moveTo(stroke.points.first().x, stroke.points.first().y)
-                                            for (i in 1 until stroke.points.size) {
-                                                lineTo(stroke.points[i].x, stroke.points[i].y)
-                                            }
-                                        }
-                                        drawPath(
-                                            path = path,
-                                            color = if (stroke.isEraser) Color.Transparent else stroke.color,
-                                            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                width = stroke.width,
-                                                cap = StrokeCap.Round,
-                                                join = StrokeJoin.Round
-                                            ),
-                                            blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
                                         )
+                                    } else {
+                                        detectTransformGestures { _, pan, zoom, _ ->
+                                            scale = (scale * zoom).coerceIn(1f, 4f)
+                                            if (scale > 1f) {
+                                                offset = Offset(
+                                                    x = offset.x + pan.x,
+                                                    y = offset.y + pan.y
+                                                )
+                                            } else {
+                                                offset = Offset.Zero
+                                            }
+                                        }
                                     }
                                 }
+                        ) {
+                            val layerModifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = offset.x
+                                    translationY = offset.y
+                                }
 
-                                strokes.forEach(drawStroke)
-                                currentStroke?.let(drawStroke)
+                            Box(modifier = layerModifier) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "PDF Page",
+                                    colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val pdfUri = currentPdf?.uriString ?: return@Canvas
+                                    val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
+                                    
+                                    strokes.forEach { stroke ->
+                                        if (stroke.points.size > 1) {
+                                            val path = androidx.compose.ui.graphics.Path().apply {
+                                                moveTo(stroke.points.first().x, stroke.points.first().y)
+                                                for (i in 1 until stroke.points.size) {
+                                                    lineTo(stroke.points[i].x, stroke.points[i].y)
+                                                }
+                                            }
+                                            drawPath(
+                                                path = path,
+                                                color = stroke.color,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                    width = stroke.width,
+                                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                                                )
+                                            )
+                                        }
+                                    }
+                                    
+                                    currentStroke?.let { stroke ->
+                                        if (stroke.points.size > 1) {
+                                            val path = androidx.compose.ui.graphics.Path().apply {
+                                                moveTo(stroke.points.first().x, stroke.points.first().y)
+                                                for (i in 1 until stroke.points.size) {
+                                                    lineTo(stroke.points[i].x, stroke.points[i].y)
+                                                }
+                                            }
+                                            drawPath(
+                                                path = path,
+                                                color = stroke.color,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                    width = stroke.width,
+                                                    cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                                                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
+                    } ?: run {
+                        if (pageCount > 0) {
+                            Text("Failed to render page", color = MaterialTheme.colorScheme.error)
+                        }
                     }
-                } else if (pageCount > 0) {
-                    Text("Failed to render page", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
     }
 }
+INNER_EOF

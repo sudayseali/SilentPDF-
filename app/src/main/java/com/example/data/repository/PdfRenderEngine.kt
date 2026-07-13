@@ -89,14 +89,18 @@ class PdfRenderEngine(private val context: Context) {
             val renderHeight = (originalHeight * finalScale).toInt().coerceAtLeast(100)
 
             val bitmap = try {
-                Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888)
+                Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.WHITE)
+                }
             } catch (e: OutOfMemoryError) {
                 Log.e("PdfRenderEngine", "OOM when creating bitmap for page $pageIndex", e)
                 System.gc() // Hint GC
                 // Fallback to smaller bitmap to save memory
                 val smallerWidth = (renderWidth / 2).coerceAtLeast(100)
                 val smallerHeight = (renderHeight / 2).coerceAtLeast(100)
-                Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888)
+                Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888).apply {
+                    eraseColor(android.graphics.Color.WHITE)
+                }
             }
 
             page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
@@ -119,18 +123,15 @@ class PdfRenderEngine(private val context: Context) {
         try {
             pdfRenderer?.close()
         } catch (e: Exception) {
-            Log.e("PdfRenderEngine", "Error closing PdfRenderer", e)
-        } finally {
-            pdfRenderer = null
+            Log.e("PdfRenderEngine", "Failed to close PdfRenderer", e)
         }
-
         try {
             fileDescriptor?.close()
         } catch (e: Exception) {
-            Log.e("PdfRenderEngine", "Error closing FileDescriptor", e)
-        } finally {
-            fileDescriptor = null
+            Log.e("PdfRenderEngine", "Failed to close fileDescriptor", e)
         }
+        pdfRenderer = null
+        fileDescriptor = null
         currentUri = null
     }
 }
