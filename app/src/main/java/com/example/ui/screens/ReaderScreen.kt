@@ -54,33 +54,26 @@ fun ReaderScreen(
     val isPdfLoading by viewModel.isPdfLoading.collectAsState()
     val bookmarks by viewModel.currentBookmarks.collectAsState()
 
-    // Gestures for Zoom & Pan
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
-    // Navigation Drawer State for bookmarks & outline
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-
-    // Detect layout width dynamically to trigger optimal resolution rendering
     var viewWidth by remember { mutableStateOf(1080) }
 
-    // Matrix to invert document colors in real-time for True Dark Mode
     val invertColorMatrix = remember {
         ColorMatrix(floatArrayOf(
-            -1f,  0f,  0f,  0f, 255f,
-             0f, -1f,  0f,  0f, 255f,
-             0f,  0f, -1f,  0f, 255f,
+            -1f,  0f,  0f,  0f, 255f, 
+             0f, -1f,  0f,  0f, 255f, 
+             0f,  0f, -1f,  0f, 255f, 
              0f,  0f,  0f,  1f,   0f
         ))
     }
 
-    // Reset zoom scale and offset on page transition
     LaunchedEffect(currentPage) {
         scale = 1f
         offset = Offset.Zero
     }
 
-    // Modal Navigation Drawer to show bookmarks and rapid outline jump
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -94,15 +87,13 @@ fun ReaderScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = "Navigation Outline",
+                        text = "Navigation",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
-
-                    // Tab choices inside Drawer: Outline / Bookmarks
-                    var selectedDrawerTab by remember { mutableStateOf(0) }
+                    var selectedDrawerTab by remember { mutableStateOf(1) }
                     TabRow(
                         selectedTabIndex = selectedDrawerTab,
                         containerColor = Color.Transparent,
@@ -120,110 +111,36 @@ fun ReaderScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (selectedDrawerTab == 0) {
-                        // Table of Contents / All Pages jump
-                        LazyColumn(
-                            verticalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            items((0 until pageCount).toList()) { index ->
-                                val isCurrent = index == currentPage
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(
-                                            if (isCurrent) MaterialTheme.colorScheme.primaryContainer 
-                                            else Color.Transparent
-                                        )
-                                        .clickable {
-                                            viewModel.jumpToPage(index, viewWidth)
-                                            coroutineScope.launch { drawerState.close() }
-                                        }
-                                        .padding(vertical = 10.dp, horizontal = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Description,
-                                        contentDescription = null,
-                                        tint = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer 
-                                               else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = "Page ${index + 1}",
-                                        fontSize = 14.sp,
-                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isCurrent) MaterialTheme.colorScheme.onPrimaryContainer 
-                                               else MaterialTheme.colorScheme.onSurface
-                                    )
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = 16.dp)
+                    ) {
+                        if (selectedDrawerTab == 1) {
+                            if (bookmarks.isEmpty()) {
+                                item {
+                                    Text("No bookmarks added yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                            }
-                        }
-                    } else {
-                        // User created Bookmarks list
-                        if (bookmarks.isEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "No bookmarks added",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        } else {
-                            LazyColumn(
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
+                            } else {
                                 items(bookmarks) { bookmark ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .clip(RoundedCornerShape(8.dp))
                                             .clickable {
                                                 viewModel.jumpToPage(bookmark.pageNumber, viewWidth)
                                                 coroutineScope.launch { drawerState.close() }
                                             }
-                                            .padding(vertical = 10.dp, horizontal = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                            .padding(vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Filled.Bookmark,
-                                                contentDescription = null,
-                                                tint = Color(0xFFFFB300),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Text(
-                                                text = bookmark.label,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                        Icon(
-                                            imageVector = Icons.Default.ChevronRight,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Text("Page ${bookmark.pageNumber + 1}", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
+                            }
+                        } else {
+                            item {
+                                Text("No outline available.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -236,62 +153,35 @@ fun ReaderScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            text = currentPdf?.fileName ?: "Reading Document",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = currentPdf?.fileName ?: "Loading...",
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            color = MaterialTheme.colorScheme.onBackground
+                            overflow = TextOverflow.Ellipsis
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            viewModel.closePdf()
-                            onNavigateBack()
-                        }) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Navigate Back",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
                     actions = {
-                        // True Dark Mode color inverter filter
                         IconButton(onClick = { viewModel.toggleTrueDarkMode() }) {
-                            Icon(
-                                imageVector = if (isTrueDarkMode) Icons.Default.Contrast else Icons.Outlined.Contrast,
-                                contentDescription = "Toggle True Dark Mode",
-                                tint = if (isTrueDarkMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground
-                            )
+                            Icon(Icons.Outlined.Contrast, contentDescription = "Toggle Dark Mode")
                         }
-
-                        // Bookmark current page
                         val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                         IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
                             Icon(
-                                imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = "Bookmark Current Page",
-                                tint = if (isBookmarked) Color(0xFFFFB300) else MaterialTheme.colorScheme.onBackground
+                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = "Bookmark",
+                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-
-                        // Outline Toggle
                         IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
-                            Icon(
-                                imageVector = Icons.Outlined.FormatListNumbered,
-                                contentDescription = "Toggle Drawer Outline",
-                                tint = MaterialTheme.colorScheme.onBackground
-                            )
+                            Icon(Icons.Outlined.FormatListNumbered, contentDescription = "Outline")
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    )
+                    }
                 )
             },
             bottomBar = {
-                // Bottom Page Control Panel
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
                     tonalElevation = 6.dp,
@@ -303,7 +193,6 @@ fun ReaderScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Page Number Slider
                         if (pageCount > 1) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -339,7 +228,6 @@ fun ReaderScreen(
                             }
                         }
 
-                        // Page indicators & Next/Prev buttons
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -353,19 +241,54 @@ fun ReaderScreen(
                                     shape = CircleShape
                                 )
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronLeft,
-                                    contentDescription = "Previous Page"
-                                )
+                                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Page")
                             }
 
+                            var showJumpDialog by remember { mutableStateOf(false) }
                             Text(
                                 text = "Page ${currentPage + 1} of $pageCount",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { showJumpDialog = true }
+                                    .padding(8.dp)
                             )
+                            if (showJumpDialog) {
+                                var jumpText by remember { mutableStateOf("") }
+                                AlertDialog(
+                                    onDismissRequest = { showJumpDialog = false },
+                                    title = { Text("Go to Page") },
+                                    text = {
+                                        OutlinedTextField(
+                                            value = jumpText,
+                                            onValueChange = { jumpText = it.filter { char -> char.isDigit() } },
+                                            label = { Text("Page Number (1 - $pageCount)") },
+                                            singleLine = true
+                                        )
+                                    },
+                                    confirmButton = {
+                                        TextButton(
+                                            onClick = {
+                                                val page = jumpText.toIntOrNull()
+                                                if (page != null && page in 1..pageCount) {
+                                                    viewModel.jumpToPage(page - 1, viewWidth)
+                                                }
+                                                showJumpDialog = false
+                                            }
+                                        ) {
+                                            Text("Go")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { showJumpDialog = false }) {
+                                            Text("Cancel")
+                                        }
+                                    }
+                                )
+                            }
 
                             IconButton(
                                 onClick = { viewModel.jumpToPage(currentPage + 1, viewWidth) },
@@ -375,82 +298,65 @@ fun ReaderScreen(
                                     shape = CircleShape
                                 )
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ChevronRight,
-                                    contentDescription = "Next Page"
-                                )
+                                Icon(Icons.Default.ChevronRight, contentDescription = "Next Page")
                             }
                         }
                     }
                 }
-            },
-            containerColor = if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.background,
-            modifier = modifier.fillMaxSize()
-        ) { innerPadding ->
+            }
+        ) { paddingValues ->
             Box(
                 modifier = Modifier
-                    .padding(innerPadding)
                     .fillMaxSize()
-                    .onSizeChanged {
-                        viewWidth = it.width
+                    .padding(paddingValues)
+                    .background(if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .onSizeChanged { size ->
+                        if (size.width > 0 && viewWidth != size.width) {
+                            viewWidth = size.width
+                            viewModel.renderCurrentPage(size.width)
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
                 if (isPdfLoading) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                } else if (pageBitmap == null) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ErrorOutline,
-                            contentDescription = "Error",
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Text(
-                            text = "Failed to render PDF page",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
+                    CircularProgressIndicator()
                 } else {
-                    // Safe rendered PDF page with smooth multitouch gestures
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    scale = (scale * zoom).coerceIn(1f, 4f)
-                                    if (scale > 1f) {
-                                        offset = Offset(
-                                            x = offset.x + pan.x,
-                                            y = offset.y + pan.y
-                                        )
-                                    } else {
-                                        offset = Offset.Zero
+                    pageBitmap?.let { bitmap ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, pan, zoom, _ ->
+                                        scale = (scale * zoom).coerceIn(1f, 4f)
+                                        if (scale > 1f) {
+                                            offset = Offset(
+                                                x = offset.x + pan.x,
+                                                y = offset.y + pan.y
+                                            )
+                                        } else {
+                                            offset = Offset.Zero
+                                        }
                                     }
                                 }
-                            }
-                            .testTag("pdf_viewport"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            bitmap = pageBitmap!!.asImageBitmap(),
-                            contentDescription = "PDF Page ${currentPage + 1}",
-                            colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
-                            modifier = Modifier
-                                .graphicsLayer(
-                                    scaleX = scale,
-                                    scaleY = scale,
-                                    translationX = offset.x,
-                                    translationY = offset.y
-                                )
-                                .fillMaxWidth()
-                                .padding(8.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                        )
+                        ) {
+                            Image(
+                                bitmap = bitmap.asImageBitmap(),
+                                contentDescription = "PDF Page",
+                                colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationX = offset.x
+                                        translationY = offset.y
+                                    }
+                            )
+                        }
+                    } ?: run {
+                        if (pageCount > 0) {
+                            Text("Failed to render page", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }

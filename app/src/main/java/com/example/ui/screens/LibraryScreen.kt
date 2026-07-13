@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.outlined.*
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +40,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.db.PdfEntity
 import com.example.ui.viewmodel.SilentPdfViewModel
+
+fun sharePdf(context: Context, pdf: PdfEntity) {
+    try {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, Uri.parse(pdf.uriString))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Share PDF"))
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +69,7 @@ fun LibraryScreen(
     val isScanning by viewModel.isScanning.collectAsState()
     val pdfsList by viewModel.libraryPdfs.collectAsState()
 
-    // Activity launcher for selecting PDF file locally (Offline SAF)
+    // Activity launcher for selecting PDF file locally
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
         onResult = { uri ->
@@ -63,10 +81,12 @@ fun LibraryScreen(
                         android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
                 } catch (e: Exception) {
-                    // Ignore if not supported
+                    // Ignore
                 }
+
                 var displayName = "Local_Document.pdf"
                 var size = 0L
+
                 try {
                     contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                         if (cursor.moveToFirst()) {
@@ -81,15 +101,15 @@ fun LibraryScreen(
                         }
                     }
                 } catch (e: Exception) {
-                    // Safe fallback
+                    // Fallback
                 }
+
                 viewModel.importPdf(uri, displayName, size)
                 onNavigateToReader()
             }
         }
     )
 
-    // Find the most recently read PDF (with valid lastPageRead progress)
     val recentlyReadPdf = remember(pdfsList) {
         pdfsList.filter { it.lastAccessTime > 0 && it.totalPages > 0 }
             .maxByOrNull { it.lastAccessTime }
@@ -98,389 +118,246 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.primary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MenuBook,
-                                contentDescription = null,
-                                tint = Color.White,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                        Text(
-                            text = "SilentPDF",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
+                title = { Text("Silent PDF", fontWeight = FontWeight.Bold) },
                 actions = {
-                    IconButton(
-                        onClick = { viewModel.triggerScan() },
-                        modifier = Modifier.testTag("scan_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Scan MediaStore",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
                     IconButton(onClick = { viewModel.toggleGridView() }) {
                         Icon(
-                            imageVector = if (isGridView) Icons.Outlined.GridView else Icons.Outlined.ViewList,
-                            contentDescription = "Toggle Grid/List",
-                            tint = MaterialTheme.colorScheme.onBackground
+                            imageVector = if (isGridView) Icons.AutoMirrored.Outlined.ViewList else Icons.Outlined.GridView,
+                            contentDescription = "Toggle View"
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
+                    var showSortMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showSortMenu = true }) {
+                            Icon(Icons.Outlined.Sort, contentDescription = "Sort")
+                        }
+                        DropdownMenu(
+                            expanded = showSortMenu,
+                            onDismissRequest = { showSortMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("By Name") },
+                                onClick = { viewModel.setSortBy(0); showSortMenu = false },
+                                trailingIcon = { if (sortBy == 0) Icon(Icons.Default.Check, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("By Date") },
+                                onClick = { viewModel.setSortBy(1); showSortMenu = false },
+                                trailingIcon = { if (sortBy == 1) Icon(Icons.Default.Check, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("By Size") },
+                                onClick = { viewModel.setSortBy(2); showSortMenu = false },
+                                trailingIcon = { if (sortBy == 2) Icon(Icons.Default.Check, null) }
+                            )
+                        }
+                    }
+                }
             )
         },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { filePickerLauncher.launch(arrayOf("application/pdf")) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier
-                    .padding(bottom = 12.dp)
-                    .testTag("import_pdf_fab")
+                containerColor = MaterialTheme.colorScheme.primary
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Import PDF File",
-                    modifier = Modifier.size(28.dp)
-                )
+                Icon(Icons.Default.Add, contentDescription = "Add PDF")
             }
-        },
-        containerColor = MaterialTheme.colorScheme.background,
-        modifier = modifier.fillMaxSize()
-    ) { innerPadding ->
+        }
+    ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .padding(innerPadding)
+            modifier = modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
+                .padding(paddingValues)
         ) {
-            // Search Text Field
+            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.setSearchQuery(it) },
-                placeholder = { Text("Search local PDFs...", color = MaterialTheme.colorScheme.onSurfaceVariant) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search icon",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Search PDFs...") },
+                leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search") },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Clear search",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Icon(Icons.Default.Close, contentDescription = "Clear Search")
                         }
                     }
                 },
-                shape = RoundedCornerShape(24.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outline,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-                ),
+                shape = RoundedCornerShape(12.dp),
                 singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .testTag("search_input")
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
+                )
             )
 
-            // Category/Tab Selector (Pills)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier.padding(bottom = 8.dp)
             ) {
-                listOf("All", "Recents", "Favorites").forEachIndexed { index, label ->
-                    val isSelected = selectedTab == index
-                    val countLabel = if (index == 0) "All (${pdfsList.size})" else label
-                    
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primaryContainer 
-                                else Color.Transparent
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline,
-                                shape = CircleShape
-                            )
-                            .clickable { viewModel.setSelectedTab(index) }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = countLabel,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer 
-                                    else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            // Recently Opened Highlight Banner
-            AnimatedVisibility(
-                visible = recentlyReadPdf != null && selectedTab == 0,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                recentlyReadPdf?.let { pdf ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 4.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.Bottom
-                        ) {
-                            Text(
-                                text = "RECENTLY OPENED",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "View Progress",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.clickable {
-                                    viewModel.openPdf(pdf)
-                                    onNavigateToReader()
-                                }
-                            )
-                        }
-
-                        Card(
-                            onClick = {
-                                viewModel.openPdf(pdf)
-                                onNavigateToReader()
-                            },
-                            shape = RoundedCornerShape(24.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("recent_pdf_card")
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(16.dp)
-                                    .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(48.dp, 64.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.MenuBook,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-
-                                Column(
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text(
-                                        text = pdf.fileName,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Text(
-                                        text = "Page ${pdf.lastPageRead + 1} of ${pdf.totalPages}",
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp)
-                                    )
-                                    
-                                    // Progress bar
-                                    val progress = if (pdf.totalPages > 0) {
-                                        (pdf.lastPageRead + 1).toFloat() / pdf.totalPages.toFloat()
-                                    } else {
-                                        0f
-                                    }
-                                    LinearProgressIndicator(
-                                        progress = { progress },
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 8.dp)
-                                            .height(5.dp)
-                                            .clip(CircleShape)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Documents Header with sorting
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "LOCAL DOCUMENTS",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    letterSpacing = 1.sp
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { viewModel.setSelectedTab(0) },
+                    text = { Text("All") }
                 )
-                
-                // Sorting options dropdown trigger or Row of options
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    listOf("Name", "Date", "Size").forEachIndexed { idx, label ->
-                        val isSortSelected = sortBy == idx
-                        Text(
-                            text = label,
-                            fontSize = 11.sp,
-                            fontWeight = if (isSortSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSortSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .clickable { viewModel.setSortBy(idx) }
-                                .padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                }
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { viewModel.setSelectedTab(1) },
+                    text = { Text("Recent") }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { viewModel.setSelectedTab(2) },
+                    text = { Text("Favorites") }
+                )
             }
 
-            // Content List / Grid
             if (isScanning) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                }
-            } else if (pdfsList.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            // List Content
+            if (pdfsList.isEmpty() && !isScanning) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
-                            imageVector = Icons.Default.FolderOpen,
-                            contentDescription = "Empty",
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(64.dp)
+                            Icons.AutoMirrored.Filled.MenuBook,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "No local PDFs found",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            text = if (searchQuery.isNotEmpty()) "No matches found" else "No PDFs found",
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Button(
-                            onClick = { filePickerLauncher.launch(arrayOf("application/pdf")) },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Text("Open a PDF file", fontWeight = FontWeight.Bold)
-                        }
                     }
                 }
             } else {
                 if (isGridView) {
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.weight(1f)
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        items(pdfsList) { pdf ->
+                        items(pdfsList, key = { it.uriString }) { pdf ->
                             GridPdfItem(
                                 pdf = pdf,
                                 onClick = {
                                     viewModel.openPdf(pdf)
                                     onNavigateToReader()
                                 },
-                                onFavoriteToggle = { viewModel.toggleFavorite(pdf) }
+                                onFavoriteToggle = { viewModel.toggleFavorite(pdf) },
+                                onShare = { sharePdf(context, pdf) },
+                                onDelete = { viewModel.deletePdf(pdf) }
                             )
                         }
                     }
                 } else {
                     LazyColumn(
-                        contentPadding = PaddingValues(bottom = 80.dp, top = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.weight(1f)
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        items(pdfsList) { pdf ->
+                        if (recentlyReadPdf != null && searchQuery.isEmpty() && selectedTab == 0) {
+                            item {
+                                Text(
+                                    "Continue Reading",
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                Card(
+                                    onClick = {
+                                        viewModel.openPdf(recentlyReadPdf)
+                                        onNavigateToReader()
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("recent_pdf_card")
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .padding(16.dp)
+                                            .fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(48.dp, 64.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(28.dp)
+                                            )
+                                        }
+                                        Column(
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Text(
+                                                text = recentlyReadPdf.fileName,
+                                                fontSize = 15.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Text(
+                                                text = "Page ${recentlyReadPdf.lastPageRead + 1} of ${recentlyReadPdf.totalPages}",
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            )
+                                            
+                                            // Progress bar
+                                            val progress = if (recentlyReadPdf.totalPages > 0) {
+                                                (recentlyReadPdf.lastPageRead + 1).toFloat() / recentlyReadPdf.totalPages.toFloat()
+                                            } else {
+                                                0f
+                                            }
+                                            LinearProgressIndicator(
+                                                progress = { progress },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(top = 8.dp)
+                                                    .height(4.dp),
+                                                strokeCap = StrokeCap.Round
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    "All Documents",
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                            }
+                        }
+
+                        items(pdfsList, key = { it.uriString }) { pdf ->
                             ListPdfItem(
                                 pdf = pdf,
                                 onClick = {
                                     viewModel.openPdf(pdf)
                                     onNavigateToReader()
                                 },
-                                onFavoriteToggle = { viewModel.toggleFavorite(pdf) }
+                                onFavoriteToggle = { viewModel.toggleFavorite(pdf) },
+                                onShare = { sharePdf(context, pdf) },
+                                onDelete = { viewModel.deletePdf(pdf) }
                             )
                         }
                     }
@@ -494,8 +371,11 @@ fun LibraryScreen(
 fun ListPdfItem(
     pdf: PdfEntity,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -520,7 +400,6 @@ fun ListPdfItem(
                 color = MaterialTheme.colorScheme.primary
             )
         }
-
         Column(
             modifier = Modifier.weight(1f)
         ) {
@@ -539,13 +418,42 @@ fun ListPdfItem(
                 modifier = Modifier.padding(top = 2.dp)
             )
         }
-
         IconButton(onClick = onFavoriteToggle) {
             Icon(
                 imageVector = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                 contentDescription = "Favorite Toggle",
                 tint = if (pdf.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        Box {
+            IconButton(onClick = { showMenu = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More Options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    onClick = {
+                        showMenu = false
+                        onShare()
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.Share, null) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    onClick = {
+                        showMenu = false
+                        onDelete()
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, null) }
+                )
+            }
         }
     }
 }
@@ -554,8 +462,11 @@ fun ListPdfItem(
 fun GridPdfItem(
     pdf: PdfEntity,
     onClick: () -> Unit,
-    onFavoriteToggle: () -> Unit
+    onFavoriteToggle: () -> Unit,
+    onShare: () -> Unit,
+    onDelete: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(20.dp),
@@ -588,22 +499,56 @@ fun GridPdfItem(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                
-                IconButton(
-                    onClick = onFavoriteToggle,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                        contentDescription = "Favorite Toggle",
-                        tint = if (pdf.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
+                Row {
+                    IconButton(
+                        onClick = onFavoriteToggle,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                            contentDescription = "Favorite Toggle",
+                            tint = if (pdf.isFavorite) Color(0xFFFFB300) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "More Options",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Share") },
+                                onClick = {
+                                    showMenu = false
+                                    onShare()
+                                },
+                                leadingIcon = { Icon(Icons.Outlined.Share, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    showMenu = false
+                                    onDelete()
+                                },
+                                leadingIcon = { Icon(Icons.Outlined.Delete, null) }
+                            )
+                        }
+                    }
                 }
             }
-
             Spacer(modifier = Modifier.height(12.dp))
-
             Text(
                 text = pdf.fileName,
                 fontSize = 13.sp,
@@ -613,9 +558,7 @@ fun GridPdfItem(
                 color = MaterialTheme.colorScheme.onSurface,
                 lineHeight = 16.sp
             )
-            
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
                 text = formatFileSize(pdf.fileSize),
                 fontSize = 11.sp,

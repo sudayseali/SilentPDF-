@@ -211,6 +211,20 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun deletePdf(pdf: PdfEntity) {
+        viewModelScope.launch {
+            try {
+                repository.deletePdf(pdf.uriString)
+                // If it's the currently open PDF, close it
+                if (_currentPdf.value?.uriString == pdf.uriString) {
+                    closePdf()
+                }
+            } catch (e: Exception) {
+                Log.e("SilentPdfViewModel", "Failed to delete PDF", e)
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         renderEngine.closeDocument()
