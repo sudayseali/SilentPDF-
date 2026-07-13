@@ -32,6 +32,10 @@ class PdfRepository(
         pdfDao.updateFavorite(uriString, isFavorite)
     }
 
+    suspend fun updateCategory(uriString: String, category: String?) = withContext(Dispatchers.IO) {
+        pdfDao.updateCategory(uriString, category)
+    }
+
     suspend fun updateProgress(uriString: String, page: Int, totalPages: Int) = withContext(Dispatchers.IO) {
         val existing = pdfDao.getPdfByUri(uriString)
         val finalTotalPages = if (totalPages > 0) totalPages else (existing?.totalPages ?: 0)
@@ -78,6 +82,36 @@ class PdfRepository(
 
     suspend fun removeBookmarkForPage(pdfUriString: String, pageNumber: Int) = withContext(Dispatchers.IO) {
         pdfDao.deleteBookmarkForPage(pdfUriString, pageNumber)
+    }
+
+    // Notes operations
+    fun getNotesForPdf(pdfUriString: String): Flow<List<com.example.data.db.NoteEntity>> {
+        return pdfDao.getNotesForPdf(pdfUriString)
+    }
+
+    suspend fun getNoteForPage(pdfUriString: String, pageNumber: Int): com.example.data.db.NoteEntity? = withContext(Dispatchers.IO) {
+        pdfDao.getNoteForPage(pdfUriString, pageNumber)
+    }
+
+    suspend fun addOrUpdateNote(pdfUriString: String, pageNumber: Int, noteText: String) = withContext(Dispatchers.IO) {
+        val existing = pdfDao.getNoteForPage(pdfUriString, pageNumber)
+        if (existing != null) {
+            pdfDao.insertNote(existing.copy(noteText = noteText, timestamp = System.currentTimeMillis()))
+        } else {
+            pdfDao.insertNote(com.example.data.db.NoteEntity(
+                pdfUriString = pdfUriString,
+                pageNumber = pageNumber,
+                noteText = noteText
+            ))
+        }
+    }
+
+    suspend fun removeNote(id: Long) = withContext(Dispatchers.IO) {
+        pdfDao.deleteNote(id)
+    }
+
+    suspend fun removeNoteForPage(pdfUriString: String, pageNumber: Int) = withContext(Dispatchers.IO) {
+        pdfDao.deleteNoteForPage(pdfUriString, pageNumber)
     }
 
     // MediaStore scan to discover local PDF documents offline

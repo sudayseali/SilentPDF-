@@ -12,7 +12,8 @@ data class PdfEntity(
     val isFavorite: Boolean = false,
     val lastPageRead: Int = 0,
     val totalPages: Int = 0,
-    val filePath: String? = null
+    val filePath: String? = null,
+    val category: String? = null
 )
 
 @Entity(tableName = "bookmarks")
@@ -21,5 +22,14 @@ data class BookmarkEntity(
     val pdfUriString: String,
     val pageNumber: Int,
     val label: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "notes")
+data class NoteEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val pdfUriString: String,
+    val pageNumber: Int,
+    val noteText: String,
     val timestamp: Long = System.currentTimeMillis()
 )

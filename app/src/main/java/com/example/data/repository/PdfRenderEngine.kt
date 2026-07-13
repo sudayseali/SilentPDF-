@@ -19,21 +19,23 @@ class PdfRenderEngine(private val context: Context) {
 
     // Cache of page bitmaps to avoid redundant rendering
     // Uses an LRU cache with max 3 active bitmaps to save RAM
-    // Do NOT manually call recycle() when evicting because Compose UI might still be drawing them. Let GC handle it.
     private val bitmapCache = object : android.util.LruCache<Int, Bitmap>(3) {}
 
-    suspend fun openDocument(uri: Uri): Int = withContext(Dispatchers.IO) {
+    suspend fun openDocument(uri: Uri, password: String? = null): Int = withContext(Dispatchers.IO) {
         closeDocument()
         try {
             currentUri = uri
             val resolver = context.contentResolver
             fileDescriptor = resolver.openFileDescriptor(uri, "r")
             fileDescriptor?.let { fd ->
-                pdfRenderer = PdfRenderer(fd)
+                pdfRenderer = createPdfRendererWithPassword(fd, password)
                 return@withContext pdfRenderer?.pageCount ?: 0
             }
+        } catch (e: SecurityException) {
+            Log.e("PdfRenderEngine", "SecurityException opening PDF document directly", e)
+            throw e
         } catch (e: Exception) {
-            Log.e("PdfRenderEngine", "Failed to open PDF document directly", e)
+            Log.e("PdfRenderEngine", "Failed to open PDF document directly, trying fallback", e)
             // Fallback: Copy PDF stream to local cache directory and open it
             try {
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -44,15 +46,43 @@ class PdfRenderEngine(private val context: Context) {
                     }
                     fileDescriptor = ParcelFileDescriptor.open(tempFile, ParcelFileDescriptor.MODE_READ_ONLY)
                     fileDescriptor?.let { fd ->
-                        pdfRenderer = PdfRenderer(fd)
+                        pdfRenderer = createPdfRendererWithPassword(fd, password)
                         return@withContext pdfRenderer?.pageCount ?: 0
                     }
                 }
+            } catch (ex: SecurityException) {
+                Log.e("PdfRenderEngine", "SecurityException during fallback", ex)
+                throw ex
             } catch (ex: Exception) {
                 Log.e("PdfRenderEngine", "Fallback stream copying failed", ex)
             }
         }
         return@withContext 0
+    }
+
+    /**
+     * Utilizes reflection to invoke Android 15 (API 35+) password-protected PdfRenderer APIs.
+     * Keeps code 100% compile-safe on older SDK classpaths while being fully operational on real devices.
+     */
+    private fun createPdfRendererWithPassword(fd: ParcelFileDescriptor, password: String?): PdfRenderer {
+        if (password != null && android.os.Build.VERSION.SDK_INT >= 35) {
+            try {
+                val builderClass = Class.forName("android.graphics.pdf.PdfRenderer\$LoadParams\$Builder")
+                val builder = builderClass.getDeclaredConstructor().newInstance()
+                val setPasswordMethod = builderClass.getMethod("setPassword", String::class.java)
+                setPasswordMethod.invoke(builder, password)
+                val loadParamsClass = Class.forName("android.graphics.pdf.PdfRenderer\$LoadParams")
+                val buildMethod = builderClass.getMethod("build")
+                val loadParams = buildMethod.invoke(builder)
+                
+                val pdfRendererClass = PdfRenderer::class.java
+                val constructor = pdfRendererClass.getConstructor(ParcelFileDescriptor::class.java, loadParamsClass)
+                return constructor.newInstance(fd, loadParams) as PdfRenderer
+            } catch (e: Exception) {
+                Log.e("PdfRenderEngine", "Failed to load via reflection, falling back to standard constructor", e)
+            }
+        }
+        return PdfRenderer(fd)
     }
 
     suspend fun renderPage(pageIndex: Int, targetWidth: Int): Bitmap? = withContext(Dispatchers.IO) {
@@ -66,7 +96,6 @@ class PdfRenderEngine(private val context: Context) {
         }
 
         try {
-
             val page = renderer.openPage(pageIndex)
             val originalWidth = page.width
             val originalHeight = page.height

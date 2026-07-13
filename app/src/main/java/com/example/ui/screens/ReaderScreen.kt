@@ -1,11 +1,26 @@
 package com.example.ui.screens
 
+import android.content.Context
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import android.print.PrintDocumentInfo
+import android.print.PrintManager
+import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.ParcelFileDescriptor
+import java.io.FileOutputStream
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,9 +31,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Contrast
-import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,7 +48,10 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +59,51 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodel.DrawingStroke
 import com.example.ui.viewmodel.SilentPdfViewModel
 import kotlinx.coroutines.launch
+
+fun printPdf(context: Context, pdf: com.example.data.db.PdfEntity) {
+    val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
+    try {
+        val printAdapter = object : PrintDocumentAdapter() {
+            override fun onWrite(
+                pages: Array<out android.print.PageRange>?,
+                destination: ParcelFileDescriptor?,
+                cancellationSignal: CancellationSignal?,
+                callback: WriteResultCallback?
+            ) {
+                try {
+                    val input = context.contentResolver.openInputStream(android.net.Uri.parse(pdf.uriString))
+                    val output = FileOutputStream(destination?.fileDescriptor)
+                    input?.copyTo(output)
+                    input?.close()
+                    output.close()
+                    callback?.onWriteFinished(arrayOf(android.print.PageRange.ALL_PAGES))
+                } catch (e: Exception) {
+                    callback?.onWriteFailed(e.message)
+                }
+            }
+
+            override fun onLayout(
+                oldAttributes: PrintAttributes?,
+                newAttributes: PrintAttributes?,
+                cancellationSignal: CancellationSignal?,
+                callback: LayoutResultCallback?,
+                extras: Bundle?
+            ) {
+                if (cancellationSignal?.isCanceled == true) {
+                    callback?.onLayoutCancelled()
+                    return
+                }
+                val info = PrintDocumentInfo.Builder(pdf.fileName)
+                    .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+                    .build()
+                callback?.onLayoutFinished(info, newAttributes != oldAttributes)
+            }
+        }
+        printManager.print(pdf.fileName, printAdapter, PrintAttributes.Builder().build())
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +113,8 @@ fun ReaderScreen(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current
+
     val currentPdf by viewModel.currentPdf.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
     val currentPage by viewModel.currentPage.collectAsState()
@@ -60,6 +123,19 @@ fun ReaderScreen(
     val isPdfLoading by viewModel.isPdfLoading.collectAsState()
     val bookmarks by viewModel.currentBookmarks.collectAsState()
     val pageDrawings by viewModel.pageDrawings.collectAsState()
+
+    // Password decrypt flows
+    val isPasswordProtected by viewModel.isPasswordProtected.collectAsState()
+    val pdfOpeningError by viewModel.pdfOpeningError.collectAsState()
+
+    // Text search flows
+    val searchInPdfQuery by viewModel.pdfSearchQuery.collectAsState()
+    val searchInPdfResults by viewModel.pdfSearchResults.collectAsState()
+    val isSearchingInPdf by viewModel.isSearchingInPdf.collectAsState()
+
+    // Outline flows
+    val pdfOutline by viewModel.pdfOutline.collectAsState()
+    val isOutlineLoading by viewModel.isOutlineLoading.collectAsState()
 
     var scale by remember { mutableStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
@@ -71,8 +147,8 @@ fun ReaderScreen(
     var selectedColor by remember { mutableStateOf(Color(0xFFF44336)) } // Default Red
     var strokeWidth by remember { mutableStateOf(8f) }
     var isEraserMode by remember { mutableStateOf(false) }
-    
-    val colors = listOf(
+
+    val drawingColors = listOf(
         Color(0xFFF44336), // Red
         Color(0xFF2196F3), // Blue
         Color(0xFF4CAF50), // Green
@@ -93,469 +169,1108 @@ fun ReaderScreen(
         ))
     }
 
+    var isFullScreen by remember { mutableStateOf(false) }
+    var showInfoDialog by remember { mutableStateOf(false) }
+    var showMoreMenu by remember { mutableStateOf(false) }
+
+    // Active Drawer Tab: 0 = Outline, 1 = Bookmarks, 2 = Search
+    var selectedDrawerTab by remember { mutableStateOf(0) }
+
+    val currentNotes by viewModel.currentNotes.collectAsState()
+    var showNoteDialog by remember { mutableStateOf(false) }
+    var noteInputText by remember { mutableStateOf("") }
+
     LaunchedEffect(currentPage) {
         scale = 1f
         offset = Offset.Zero
         currentStroke = null
     }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            ModalDrawerSheet(
-                drawerContainerColor = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.width(320.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        text = "Navigation",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                    var selectedDrawerTab by remember { mutableStateOf(1) }
-                    TabRow(
-                        selectedTabIndex = selectedDrawerTab,
-                        containerColor = Color.Transparent,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ) {
-                        Tab(
-                            selected = selectedDrawerTab == 0,
-                            onClick = { selectedDrawerTab = 0 },
-                            text = { Text("Outline") }
-                        )
-                        Tab(
-                            selected = selectedDrawerTab == 1,
-                            onClick = { selectedDrawerTab = 1 },
-                            text = { Text("Bookmarks (${bookmarks.size})") }
-                        )
-                    }
+    // Handles the Encrypted Lock Screen separately
+    if (isPasswordProtected) {
+        var passwordInput by remember { mutableStateOf("") }
+        var passwordVisible by remember { mutableStateOf(false) }
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(vertical = 16.dp)
-                    ) {
-                        if (selectedDrawerTab == 1) {
-                            if (bookmarks.isEmpty()) {
-                                item {
-                                    Text("No bookmarks added yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            } else {
-                                items(bookmarks) { bookmark ->
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                viewModel.jumpToPage(bookmark.pageNumber, viewWidth)
-                                                coroutineScope.launch { drawerState.close() }
-                                            }
-                                            .padding(vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Bookmark, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        Text("Page ${bookmark.pageNumber + 1}", fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-                            }
-                        } else {
-                            item {
-                                Text("No outline available.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Top Exit Nav Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start
+                ) {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ka laabo")
                     }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Locked PDF",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "Faylkaan waa la xidhay",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Fadlan geli password-ka saxda ah si aad u furto dukumentigan.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                OutlinedTextField(
+                    value = passwordInput,
+                    onValueChange = { passwordInput = it },
+                    placeholder = { Text("Geli password-ka...") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                            Icon(
+                                imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                contentDescription = "Toggle password visibility"
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    singleLine = true,
+                    isError = pdfOpeningError != null,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    )
+                )
+
+                if (pdfOpeningError != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = pdfOpeningError ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(28.dp))
+
+                Button(
+                    onClick = {
+                        if (passwordInput.isNotBlank() && currentPdf != null) {
+                            viewModel.openPdf(currentPdf!!, passwordInput)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(Icons.Default.VpnKey, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Fura Dukumentiga", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
-    ) {
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = currentPdf?.fileName ?: "Loading...",
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    },
-                    actions = {
-                        IconButton(onClick = { isDrawingMode = !isDrawingMode }) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Draw",
-                                tint = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(onClick = { viewModel.toggleTrueDarkMode() }) {
-                            Icon(Icons.Outlined.Contrast, contentDescription = "Toggle Dark Mode")
-                        }
-                        val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
-                        IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
-                            Icon(
-                                imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = "Bookmark",
-                                tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
-                            Icon(Icons.Outlined.FormatListNumbered, contentDescription = "Outline")
-                        }
-                    }
-                )
-            },
-            bottomBar = {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                    modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+    } else {
+        // Standard high-fidelity PDF Reader Layout with Navigation Drawer
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                ModalDrawerSheet(
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.width(320.dp)
                 ) {
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (isDrawingMode) {
-                            // Drawing Toolbar
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    IconButton(
-                                        onClick = { isEraserMode = false },
-                                        modifier = Modifier.background(
-                                            color = if (!isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Brush,
-                                            contentDescription = "Pen",
-                                            tint = if (!isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { isEraserMode = true },
-                                        modifier = Modifier.background(
-                                            color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(
-                                            Icons.Default.AutoFixHigh,
-                                            contentDescription = "Eraser",
-                                            tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                                
-                                var showColorMenu by remember { mutableStateOf(false) }
-                                Box {
-                                    IconButton(
-                                        onClick = { showColorMenu = true },
-                                        enabled = !isEraserMode
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Palette, 
-                                            contentDescription = "Color", 
-                                            tint = if (isEraserMode) Color.Gray else selectedColor
-                                        )
-                                    }
-                                    DropdownMenu(expanded = showColorMenu, onDismissRequest = { showColorMenu = false }) {
-                                        colors.forEach { color ->
-                                            DropdownMenuItem(
-                                                text = { Text("Select") },
-                                                leadingIcon = {
-                                                    Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(color).border(1.dp, Color.Gray, CircleShape))
-                                                },
-                                                onClick = {
-                                                    selectedColor = color
-                                                    showColorMenu = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    IconButton(onClick = { 
-                                        currentPdf?.uriString?.let { uri ->
-                                            viewModel.undoLastStroke(uri, currentPage)
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.Undo, contentDescription = "Undo")
-                                    }
-                                }
-                            }
-                            
-                            // Stroke width slider
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.LineWeight, contentDescription = "Thickness", modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Slider(
-                                    value = strokeWidth,
-                                    onValueChange = { strokeWidth = it },
-                                    valueRange = 2f..40f,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        }
-
-                        // Navigation Controls
-                        if (pageCount > 1) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "1",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Slider(
-                                    value = currentPage.toFloat(),
-                                    onValueChange = { viewModel.jumpToPage(it.toInt(), viewWidth) },
-                                    valueRange = 0f..(pageCount - 1).toFloat(),
-                                    steps = (pageCount - 2).coerceAtLeast(0),
-                                    colors = SliderDefaults.colors(
-                                        thumbColor = MaterialTheme.colorScheme.primary,
-                                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(horizontal = 12.dp)
-                                        .testTag("page_slider")
-                                )
-                                Text(
-                                    text = "$pageCount",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { viewModel.jumpToPage(currentPage - 1, viewWidth) },
-                                enabled = currentPage > 0,
-                                modifier = Modifier.background(
-                                    color = if (currentPage > 0) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                            ) {
-                                Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Page")
-                            }
-
-                            var showJumpDialog by remember { mutableStateOf(false) }
-                            Text(
-                                text = "Page ${currentPage + 1} of $pageCount",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .clickable { showJumpDialog = true }
-                                    .padding(8.dp)
-                            )
-                            if (showJumpDialog) {
-                                var jumpText by remember { mutableStateOf("") }
-                                AlertDialog(
-                                    onDismissRequest = { showJumpDialog = false },
-                                    title = { Text("Go to Page") },
-                                    text = {
-                                        OutlinedTextField(
-                                            value = jumpText,
-                                            onValueChange = { jumpText = it.filter { char -> char.isDigit() } },
-                                            label = { Text("Page Number (1 - $pageCount)") },
-                                            singleLine = true
-                                        )
-                                    },
-                                    confirmButton = {
-                                        TextButton(
-                                            onClick = {
-                                                val page = jumpText.toIntOrNull()
-                                                if (page != null && page in 1..pageCount) {
-                                                    viewModel.jumpToPage(page - 1, viewWidth)
-                                                }
-                                                showJumpDialog = false
-                                            }
-                                        ) {
-                                            Text("Go")
-                                        }
-                                    },
-                                    dismissButton = {
-                                        TextButton(onClick = { showJumpDialog = false }) {
-                                            Text("Cancel")
-                                        }
-                                    }
-                                )
-                            }
-
-                            IconButton(
-                                onClick = { viewModel.jumpToPage(currentPage + 1, viewWidth) },
-                                enabled = currentPage < pageCount - 1,
-                                modifier = Modifier.background(
-                                    color = if (currentPage < pageCount - 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                    shape = CircleShape
-                                )
-                            ) {
-                                Icon(Icons.Default.ChevronRight, contentDescription = "Next Page")
-                            }
-                        }
-                    }
-                }
-            }
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .background(if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .onSizeChanged { size ->
-                        if (size.width > 0 && viewWidth != size.width) {
-                            viewWidth = size.width
-                            viewModel.renderCurrentPage(size.width)
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                if (isPdfLoading) {
-                    CircularProgressIndicator()
-                } else if (pageBitmap != null) {
-                    val bitmap = pageBitmap!!
-                    Box(
-                        modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(isDrawingMode) {
-                                if (isDrawingMode) {
-                                    detectDragGestures(
-                                        onDragStart = { startOffset ->
-                                            val centerX = size.width / 2f
-                                            val centerY = size.height / 2f
-                                            val unscaledX = (startOffset.x - offset.x - centerX) / scale + centerX
-                                            val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
-                                            currentStroke = DrawingStroke(
-                                                points = listOf(Offset(unscaledX, unscaledY)),
-                                                color = selectedColor,
-                                                width = strokeWidth / scale,
-                                                isEraser = isEraserMode
+                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Hagaha Buugga",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+
+                        // 4 Navigation Tabs: TOC, Bookmarks, Search, and Notes
+                        TabRow(
+                            selectedTabIndex = selectedDrawerTab,
+                            containerColor = Color.Transparent,
+                            contentColor = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Tab(
+                                selected = selectedDrawerTab == 0,
+                                onClick = { selectedDrawerTab = 0 },
+                                text = { Text("TOC", fontSize = 11.sp) }
+                            )
+                            Tab(
+                                selected = selectedDrawerTab == 1,
+                                onClick = { selectedDrawerTab = 1 },
+                                text = { Text("Bkmks", fontSize = 11.sp) }
+                            )
+                            Tab(
+                                selected = selectedDrawerTab == 2,
+                                onClick = { selectedDrawerTab = 2 },
+                                text = { Text("Raadi", fontSize = 11.sp) }
+                            )
+                            Tab(
+                                selected = selectedDrawerTab == 3,
+                                onClick = { selectedDrawerTab = 3 },
+                                text = { Text("Notes", fontSize = 11.sp) }
+                            )
+                        }
+
+                        // Lazy viewport inside the drawer based on active tab
+                        Box(modifier = Modifier.weight(1f)) {
+                            if (selectedDrawerTab == 3) {
+                                // Notes list
+                                if (currentNotes.isEmpty()) {
+                                    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit, 
+                                                contentDescription = null, 
+                                                modifier = Modifier.size(48.dp), 
+                                                tint = MaterialTheme.colorScheme.outline
                                             )
-                                        },
-                                        onDrag = { change, _ ->
-                                            val centerX = size.width / 2f
-                                            val centerY = size.height / 2f
-                                            val unscaledX = (change.position.x - offset.x - centerX) / scale + centerX
-                                            val unscaledY = (change.position.y - offset.y - centerY) / scale + centerY
-                                            currentStroke = currentStroke?.copy(
-                                                points = currentStroke!!.points + Offset(unscaledX, unscaledY)
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(
+                                                text = "Ma jiraan qoraallo (notes) aad ku dartay buuggan.",
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center
                                             )
-                                        },
-                                        onDragEnd = {
-                                            currentStroke?.let { stroke ->
-                                                if (stroke.points.size > 1) {
-                                                    currentPdf?.uriString?.let { uri ->
-                                                        viewModel.addStroke(uri, currentPage, stroke)
+                                        }
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(currentNotes) { note ->
+                                            Card(
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                                ),
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        viewModel.jumpToPage(note.pageNumber, viewWidth)
+                                                        coroutineScope.launch { drawerState.close() }
+                                                    }
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(12.dp)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "Bogga ${note.pageNumber + 1}",
+                                                            fontSize = 12.sp,
+                                                            fontWeight = FontWeight.Bold,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        IconButton(
+                                                            onClick = {
+                                                                viewModel.removeNote(note.id)
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Outlined.Delete,
+                                                                contentDescription = "Tirtir",
+                                                                tint = MaterialTheme.colorScheme.error,
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(6.dp))
+                                                    Text(
+                                                        text = note.noteText,
+                                                        fontSize = 13.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 3,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else when (selectedDrawerTab) {
+                                0 -> { // Outlines / Chapters / TOC
+                                    if (isOutlineLoading) {
+                                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(strokeWidth = 3.dp)
+                                        }
+                                    } else if (pdfOutline.isEmpty()) {
+                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(Icons.Outlined.ImportContacts, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                    text = "Ma jiraan cutubyo la helay",
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxSize(),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            items(pdfOutline) { item ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .clickable {
+                                                            viewModel.jumpToPage(item.pageNumber, viewWidth)
+                                                            coroutineScope.launch { drawerState.close() }
+                                                        }
+                                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MenuBook,
+                                                        contentDescription = null,
+                                                        tint = if (currentPage == item.pageNumber) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(12.dp))
+                                                    Text(
+                                                        text = item.title,
+                                                        fontSize = 13.sp,
+                                                        fontWeight = if (currentPage == item.pageNumber) FontWeight.Bold else FontWeight.Normal,
+                                                        color = if (currentPage == item.pageNumber) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(
+                                                        text = "${item.pageNumber + 1}",
+                                                        fontSize = 11.sp,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        fontWeight = FontWeight.Bold,
+                                                        modifier = Modifier
+                                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                1 -> { // Bookmarks list
+                                    if (bookmarks.isEmpty()) {
+                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Icon(Icons.Outlined.BookmarkBorder, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                                                Spacer(modifier = Modifier.height(12.dp))
+                                                Text(
+                                                    text = "Ma jiraan bogag aad calaamadsatay dhowaan.",
+                                                    fontSize = 13.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxSize(),
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            items(bookmarks) { bookmark ->
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .clickable {
+                                                            viewModel.jumpToPage(bookmark.pageNumber, viewWidth)
+                                                            coroutineScope.launch { drawerState.close() }
+                                                        }
+                                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Bookmark,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(12.dp))
+                                                    Text(
+                                                        text = "Bogga ${bookmark.pageNumber + 1}",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = if (currentPage == bookmark.pageNumber) FontWeight.Bold else FontWeight.Normal,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        modifier = Modifier.weight(1f)
+                                                    )
+                                                    IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
+                                                        Icon(Icons.Default.Delete, contentDescription = "Tirtir", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                                                     }
                                                 }
                                             }
-                                            currentStroke = null
-                                        },
-                                        onDragCancel = {
-                                            currentStroke = null
                                         }
-                                    )
-                                } else {
-                                    detectTransformGestures { _, pan, zoom, _ ->
-                                        scale = (scale * zoom).coerceIn(1f, 4f)
-                                        if (scale > 1f) {
-                                            offset = Offset(
-                                                x = offset.x + pan.x,
-                                                y = offset.y + pan.y
+                                    }
+                                }
+
+                                2 -> { // Text search inside PDF Content
+                                    Column(modifier = Modifier.fillMaxSize()) {
+                                        OutlinedTextField(
+                                            value = searchInPdfQuery,
+                                            onValueChange = { viewModel.searchInPdf(it) },
+                                            placeholder = { Text("Eray ku raadi buugga...", fontSize = 13.sp) },
+                                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                                            trailingIcon = {
+                                                if (searchInPdfQuery.isNotEmpty()) {
+                                                    IconButton(onClick = { viewModel.searchInPdf("") }) {
+                                                        Icon(Icons.Default.Close, contentDescription = "Eber", modifier = Modifier.size(16.dp))
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 8.dp),
+                                            singleLine = true,
+                                            shape = RoundedCornerShape(12.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                             )
+                                        )
+
+                                        if (isSearchingInPdf) {
+                                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                                CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                                            }
+                                        } else if (searchInPdfQuery.isEmpty()) {
+                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = "Ku qor eray barta sare si aad uga raadiso dhammaan boggaga buugga.",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
+                                        } else if (searchInPdfResults.isEmpty()) {
+                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = "Wax natiijo ah lama helin.",
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = MaterialTheme.colorScheme.error,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
                                         } else {
-                                            offset = Offset.Zero
+                                            Text(
+                                                text = "La helay ${searchInPdfResults.size} meelood",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
+                                            )
+                                            LazyColumn(
+                                                modifier = Modifier.fillMaxSize(),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                items(searchInPdfResults) { result ->
+                                                    Card(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .clickable {
+                                                                viewModel.jumpToPage(result.pageNumber, viewWidth)
+                                                                coroutineScope.launch { drawerState.close() }
+                                                            },
+                                                        colors = CardDefaults.cardColors(
+                                                            containerColor = if (currentPage == result.pageNumber) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                                                        ),
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    ) {
+                                                        Column(modifier = Modifier.padding(10.dp)) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Text(
+                                                                    text = "Bogga ${result.pageNumber + 1}",
+                                                                    fontSize = 11.sp,
+                                                                    fontWeight = FontWeight.Bold,
+                                                                    color = MaterialTheme.colorScheme.primary
+                                                                )
+                                                                Text(
+                                                                    text = "${result.occurrencesCount} jeer",
+                                                                    fontSize = 9.sp,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                                )
+                                                            }
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Text(
+                                                                text = result.snippet,
+                                                                fontSize = 12.sp,
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                                maxLines = 2,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        ) {
+            Scaffold(
+                topBar = {
+                    AnimatedVisibility(
+                        visible = !isFullScreen,
+                        enter = slideInVertically(initialOffsetY = { -it }),
+                        exit = slideOutVertically(targetOffsetY = { -it })
                     ) {
-                        val layerModifier = Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                                translationX = offset.x
-                                translationY = offset.y
-                                // Need compositing strategy offscreen for BlendMode.Clear to work on this layer ONLY
-                                compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                            }
-
-                        Box(modifier = layerModifier) {
-                            Image(
-                                bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "PDF Page",
-                                colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                            
-                            Canvas(modifier = Modifier.fillMaxSize()) {
-                                val pdfUri = currentPdf?.uriString ?: return@Canvas
-                                val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    text = currentPdf?.fileName ?: "Silent PDF",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 18.sp
+                                )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = onNavigateBack) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ka laabo")
+                                }
+                            },
+                            actions = {
+                                // Search Icon - triggers drawer text search directly
+                                IconButton(onClick = {
+                                    selectedDrawerTab = 2 // Switch directly to search tab
+                                    coroutineScope.launch { drawerState.open() }
+                                }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Ku dhex raadi erayo", tint = MaterialTheme.colorScheme.primary)
+                                }
                                 
-                                val drawStroke = { stroke: DrawingStroke ->
-                                    if (stroke.points.size > 1) {
-                                        val path = androidx.compose.ui.graphics.Path().apply {
-                                            moveTo(stroke.points.first().x, stroke.points.first().y)
-                                            for (i in 1 until stroke.points.size) {
-                                                lineTo(stroke.points[i].x, stroke.points[i].y)
+                                IconButton(onClick = { isDrawingMode = !isDrawingMode }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Sawir / Qor",
+                                        tint = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = { viewModel.toggleTrueDarkMode() }) {
+                                    Icon(Icons.Outlined.Contrast, contentDescription = "Madow / Caddaan")
+                                }
+                                val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
+                                IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
+                                    Icon(
+                                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                        contentDescription = "Bookmark",
+                                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Outlined.FormatListNumbered, contentDescription = "TOC")
+                                }
+                                Box {
+                                    IconButton(onClick = { showMoreMenu = true }) {
+                                        Icon(Icons.Default.MoreVert, contentDescription = "Dheeraad")
+                                    }
+                                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
+                                         DropdownMenuItem(
+                                             text = { Text("Ku dar/Beddel Qoraal (Note)") },
+                                             leadingIcon = { Icon(Icons.Default.Edit, null) },
+                                             onClick = {
+                                                 val existing = currentNotes.find { it.pageNumber == currentPage }
+                                                 noteInputText = existing?.noteText ?: ""
+                                                 showNoteDialog = true
+                                                 showMoreMenu = false
+                                             }
+                                         )
+                                        DropdownMenuItem(
+                                            text = { Text("Toos u weyneey (Fullscreen)") },
+                                            leadingIcon = { Icon(Icons.Default.Fullscreen, null) },
+                                            onClick = {
+                                                isFullScreen = true
+                                                showMoreMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Daabac (Print)") },
+                                            leadingIcon = { Icon(Icons.Default.Print, null) },
+                                            onClick = {
+                                                currentPdf?.let { printPdf(context, it) }
+                                                showMoreMenu = false
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Faahfaahin (Details)") },
+                                            leadingIcon = { Icon(Icons.Default.Info, null) },
+                                            onClick = {
+                                                showInfoDialog = true
+                                                showMoreMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                },
+                bottomBar = {
+                    AnimatedVisibility(
+                        visible = !isFullScreen,
+                        enter = slideInVertically(initialOffsetY = { it }),
+                        exit = slideOutVertically(targetOffsetY = { it })
+                    ) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 6.dp,
+                            modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Dynamic Drawing markup toolbar if enabled
+                                AnimatedVisibility(
+                                    visible = isDrawingMode,
+                                    enter = expandVertically(),
+                                    exit = shrinkVertically()
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                IconButton(
+                                                    onClick = { isEraserMode = false },
+                                                    modifier = Modifier.background(
+                                                        color = if (!isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Brush,
+                                                        contentDescription = "Qalin",
+                                                        tint = if (!isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { isEraserMode = true },
+                                                    modifier = Modifier.background(
+                                                        color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.AutoFixHigh,
+                                                        contentDescription = "Tirtire",
+                                                        tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+
+                                            // Drawing Color Circles selection
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier.padding(horizontal = 8.dp)
+                                            ) {
+                                                val pickerColors = drawingColors.take(6)
+                                                pickerColors.forEach { color ->
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .size(24.dp)
+                                                            .clip(CircleShape)
+                                                            .background(color)
+                                                            .border(
+                                                                width = if (selectedColor == color && !isEraserMode) 2.dp else 1.dp,
+                                                                color = if (selectedColor == color && !isEraserMode) MaterialTheme.colorScheme.primary else Color.LightGray,
+                                                                shape = CircleShape
+                                                            )
+                                                            .clickable(enabled = !isEraserMode) { selectedColor = color }
+                                                    )
+                                                }
+                                            }
+
+                                            IconButton(onClick = {
+                                                currentPdf?.uriString?.let { uri ->
+                                                    viewModel.undoLastStroke(uri, currentPage)
+                                                }
+                                            }) {
+                                                Icon(Icons.Default.Undo, contentDescription = "Ka laabo qoraalka")
                                             }
                                         }
-                                        drawPath(
-                                            path = path,
-                                            color = if (stroke.isEraser) Color.Transparent else stroke.color,
-                                            style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                width = stroke.width,
-                                                cap = StrokeCap.Round,
-                                                join = StrokeJoin.Round
+
+                                        // Slider control for brush width
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Default.LineWeight, contentDescription = "Xajmiga", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Slider(
+                                                value = strokeWidth,
+                                                onValueChange = { strokeWidth = it },
+                                                valueRange = 2f..40f,
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                        }
+                                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), modifier = Modifier.padding(vertical = 4.dp))
+                                    }
+                                }
+
+                                // Page Scrubber Slider
+                                if (pageCount > 1) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "1",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Slider(
+                                            value = currentPage.toFloat(),
+                                            onValueChange = { viewModel.jumpToPage(it.toInt(), viewWidth) },
+                                            valueRange = 0f..(pageCount - 1).toFloat(),
+                                            steps = (pageCount - 2).coerceAtLeast(0),
+                                            colors = SliderDefaults.colors(
+                                                thumbColor = MaterialTheme.colorScheme.primary,
+                                                activeTrackColor = MaterialTheme.colorScheme.primary,
+                                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
                                             ),
-                                            blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .padding(horizontal = 12.dp)
+                                                .testTag("page_slider")
+                                        )
+                                        Text(
+                                            text = "$pageCount",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
 
-                                strokes.forEach(drawStroke)
-                                currentStroke?.let(drawStroke)
+                                // Jump button and page controllers
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = { viewModel.jumpToPage(currentPage - 1, viewWidth) },
+                                        enabled = currentPage > 0,
+                                        modifier = Modifier.background(
+                                            color = if (currentPage > 0) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.ChevronLeft, contentDescription = "U gudub boggii hore")
+                                    }
+
+                                    var showJumpDialog by remember { mutableStateOf(false) }
+                                    Text(
+                                        text = "Bogga ${currentPage + 1} ee $pageCount",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                            .clickable { showJumpDialog = true }
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+
+                                    if (showJumpDialog) {
+                                        var jumpText by remember { mutableStateOf("") }
+                                        AlertDialog(
+                                            onDismissRequest = { showJumpDialog = false },
+                                            title = { Text("U bood Bog", fontWeight = FontWeight.Bold) },
+                                            text = {
+                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    Text("Ku qor lambarka bogga aad rabto inaad u booddo (1 ilaa $pageCount):", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    OutlinedTextField(
+                                                        value = jumpText,
+                                                        onValueChange = { jumpText = it.filter { char -> char.isDigit() } },
+                                                        label = { Text("Nambarka Bogga") },
+                                                        singleLine = true,
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                }
+                                            },
+                                            confirmButton = {
+                                                Button(
+                                                    onClick = {
+                                                        val page = jumpText.toIntOrNull()
+                                                        if (page != null && page in 1..pageCount) {
+                                                            viewModel.jumpToPage(page - 1, viewWidth)
+                                                        }
+                                                        showJumpDialog = false
+                                                    },
+                                                    shape = RoundedCornerShape(12.dp)
+                                                ) {
+                                                    Text("Haa")
+                                                }
+                                            },
+                                            dismissButton = {
+                                                TextButton(onClick = { showJumpDialog = false }) {
+                                                    Text("Ka laabo")
+                                                }
+                                            },
+                                            shape = RoundedCornerShape(24.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = { viewModel.jumpToPage(currentPage + 1, viewWidth) },
+                                        enabled = currentPage < pageCount - 1,
+                                        modifier = Modifier.background(
+                                            color = if (currentPage < pageCount - 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.ChevronRight, contentDescription = "U gudub boga xiga")
+                                    }
+                                }
                             }
                         }
                     }
-                } else if (pageCount > 0) {
-                    Text("Failed to render page", color = MaterialTheme.colorScheme.error)
+                }
+            ) { paddingValues ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .background(if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .onSizeChanged { size ->
+                            if (size.width > 0 && viewWidth != size.width) {
+                                viewWidth = size.width
+                                viewModel.renderCurrentPage(size.width)
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showInfoDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showInfoDialog = false },
+                            title = { Text("Faahfaahinta Buugga", fontWeight = FontWeight.Bold) },
+                            text = {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    currentPdf?.let {
+                                        Text("Magaca: ${it.fileName}", fontWeight = FontWeight.Bold)
+                                        Text("Mugga: ${formatFileSize(it.fileSize)}")
+                                        Text("Bogagga: ${it.totalPages}")
+                                        if (it.category != null) {
+                                            Text("Folder: ${it.category}")
+                                        }
+                                    } ?: Text("Waa la soo raryaa...")
+                                }
+                            },
+                            confirmButton = {
+                                Button(onClick = { showInfoDialog = false }, shape = RoundedCornerShape(12.dp)) {
+                                    Text("Xidh")
+                                }
+                            },
+                            shape = RoundedCornerShape(24.dp)
+                        )
+                    }
+
+                    if (isPdfLoading) {
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    } else if (pageBitmap != null) {
+                        val bitmap = pageBitmap!!
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(isDrawingMode) {
+                                    if (isDrawingMode) {
+                                        detectDragGestures(
+                                            onDragStart = { startOffset ->
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                val unscaledX = (startOffset.x - offset.x - centerX) / scale + centerX
+                                                val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
+                                                currentStroke = DrawingStroke(
+                                                    points = listOf(Offset(unscaledX, unscaledY)),
+                                                    color = selectedColor,
+                                                    width = strokeWidth / scale,
+                                                    isEraser = isEraserMode
+                                                )
+                                            },
+                                            onDrag = { change, _ ->
+                                                val centerX = size.width / 2f
+                                                val centerY = size.height / 2f
+                                                val unscaledX = (change.position.x - offset.x - centerX) / scale + centerX
+                                                val unscaledY = (change.position.y - offset.y - centerY) / scale + centerY
+                                                currentStroke = currentStroke?.copy(
+                                                    points = currentStroke!!.points + Offset(unscaledX, unscaledY)
+                                                )
+                                            },
+                                            onDragEnd = {
+                                                currentStroke?.let { stroke ->
+                                                    if (stroke.points.size > 1) {
+                                                        currentPdf?.uriString?.let { uri ->
+                                                            viewModel.addStroke(uri, currentPage, stroke)
+                                                        }
+                                                    }
+                                                }
+                                                currentStroke = null
+                                            },
+                                            onDragCancel = {
+                                                currentStroke = null
+                                            }
+                                        )
+                                    } else {
+                                        detectTransformGestures { _, pan, zoom, _ ->
+                                            scale = (scale * zoom).coerceIn(1f, 4f)
+                                            if (scale > 1f) {
+                                                offset = Offset(
+                                                    x = offset.x + pan.x,
+                                                    y = offset.y + pan.y
+                                                )
+                                            } else {
+                                                offset = Offset.Zero
+                                            }
+                                        }
+                                    }
+                                }
+                                .pointerInput(isDrawingMode) {
+                                    detectTapGestures(onTap = {
+                                        if (!isDrawingMode) {
+                                            isFullScreen = !isFullScreen
+                                        }
+                                    })
+                                }
+                        ) {
+                            val layerModifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    translationX = offset.x
+                                    translationY = offset.y
+                                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                }
+
+                            Box(modifier = layerModifier) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = "Bogga PDF",
+                                    colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    val pdfUri = currentPdf?.uriString ?: return@Canvas
+                                    val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
+                                    
+                                    val drawStroke = { stroke: DrawingStroke ->
+                                        if (stroke.points.size > 1) {
+                                            val path = androidx.compose.ui.graphics.Path().apply {
+                                                moveTo(stroke.points.first().x, stroke.points.first().y)
+                                                for (i in 1 until stroke.points.size) {
+                                                    lineTo(stroke.points[i].x, stroke.points[i].y)
+                                                }
+                                            }
+                                            drawPath(
+                                                path = path,
+                                                color = if (stroke.isEraser) Color.Transparent else stroke.color,
+                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                                    width = stroke.width,
+                                                    cap = StrokeCap.Round,
+                                                    join = StrokeJoin.Round
+                                                ),
+                                                blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
+                                            )
+                                        }
+                                    }
+
+                                    strokes.forEach(drawStroke)
+                                    currentStroke?.let(drawStroke)
+                                }
+                            }
+                        }
+
+                        // If current page has a note, show a beautiful badge overlay
+                        val currentPageNote = currentNotes.find { it.pageNumber == currentPage }
+                        if (currentPageNote != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.TopEnd
+                            ) {
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                    modifier = Modifier
+                                        .widthIn(max = 240.dp)
+                                        .clickable {
+                                            noteInputText = currentPageNote.noteText
+                                            showNoteDialog = true
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Description,
+                                            contentDescription = "Note",
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Qoraal Bogga",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            Text(
+                                                text = currentPageNote.noteText,
+                                                fontSize = 12.sp,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if (pageCount > 0) {
+                        Text("Ma aanan rari karin boggan", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
+    }
+
+    if (showNoteDialog) {
+        AlertDialog(
+            onDismissRequest = { showNoteDialog = false },
+            title = {
+                Text(
+                    text = "Qoraalka Bogga ${currentPage + 1}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = noteInputText,
+                        onValueChange = { noteInputText = it },
+                        label = { Text("Qoraalkaaga") },
+                        placeholder = { Text("Halkan ku qor qoraal gaar ah...") },
+                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (noteInputText.isNotBlank()) {
+                            viewModel.addOrUpdateNote(currentPage, noteInputText)
+                        } else {
+                            viewModel.removeNoteForPage(currentPage)
+                        }
+                        showNoteDialog = false
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Kaydi")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val currentPageNote = currentNotes.find { it.pageNumber == currentPage }
+                    if (currentPageNote != null) {
+                        TextButton(
+                            onClick = {
+                                viewModel.removeNoteForPage(currentPage)
+                                showNoteDialog = false
+                            },
+                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text("Tirtir")
+                        }
+                    }
+                    TextButton(onClick = { showNoteDialog = false }) {
+                        Text("Ka laabo")
+                    }
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 }

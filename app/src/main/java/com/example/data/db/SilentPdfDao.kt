@@ -35,6 +35,9 @@ interface SilentPdfDao {
     @Query("UPDATE pdfs SET isFavorite = :isFavorite WHERE uriString = :uriString")
     suspend fun updateFavorite(uriString: String, isFavorite: Boolean)
 
+    @Query("UPDATE pdfs SET category = :category WHERE uriString = :uriString")
+    suspend fun updateCategory(uriString: String, category: String?)
+
     @Query("DELETE FROM pdfs WHERE uriString = :uriString")
     suspend fun deletePdf(uriString: String)
 
@@ -50,4 +53,20 @@ interface SilentPdfDao {
 
     @Query("DELETE FROM bookmarks WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber")
     suspend fun deleteBookmarkForPage(pdfUriString: String, pageNumber: Int)
+
+    // Notes queries
+    @Query("SELECT * FROM notes WHERE pdfUriString = :pdfUriString ORDER BY pageNumber ASC, timestamp DESC")
+    fun getNotesForPdf(pdfUriString: String): Flow<List<NoteEntity>>
+
+    @Query("SELECT * FROM notes WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber LIMIT 1")
+    suspend fun getNoteForPage(pdfUriString: String, pageNumber: Int): NoteEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNote(note: NoteEntity)
+
+    @Query("DELETE FROM notes WHERE id = :id")
+    suspend fun deleteNote(id: Long)
+
+    @Query("DELETE FROM notes WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber")
+    suspend fun deleteNoteForPage(pdfUriString: String, pageNumber: Int)
 }
