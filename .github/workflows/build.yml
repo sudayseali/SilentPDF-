@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-debug:
-    name: Build Debug APK (Ready to Install)
+    name: SilentPDF (Ready to Install)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -23,17 +23,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
+      - name: SilentPDF
         run: ./gradlew assembleDebug
 
-      - name: Rename Debug APK
-        run: mv app/build/outputs/apk/debug/app-debug.apk SilentPDF-Debug.apk
+      - name: SilentPDF
+        run: mv app/build/outputs/apk/debug/SilentPDF.apk SilentPDF.apk
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: SilentPDF-Debug
-          path: SilentPDF-Debug.apk
+          name: SilentPDf
+          path: SilentPDF.apk
 
   build-release:
     name: Build & Sign Release APK
