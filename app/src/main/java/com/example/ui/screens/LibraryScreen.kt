@@ -100,6 +100,7 @@ fun LibraryScreen(
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var folderNameInput by remember { mutableStateOf("") }
     var pdfToMoveToFolder by remember { mutableStateOf<PdfEntity?>(null) }
+    var pdfToDelete by remember { mutableStateOf<PdfEntity?>(null) }
     var showSortMenu by remember { mutableStateOf(false) }
     val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     var showSecurityDialog by remember { mutableStateOf(false) }
@@ -213,7 +214,7 @@ fun LibraryScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp),
-                placeholder = { Text("Raadi magaca buugga...", fontSize = 14.sp) },
+                placeholder = { Text("Search book name...", fontSize = 14.sp) },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -251,17 +252,17 @@ fun LibraryScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { viewModel.setSelectedTab(0) },
-                    text = { Text("Dhammaan", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("All", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { viewModel.setSelectedTab(1) },
-                    text = { Text("Kuwa dhow", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("Recent", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { viewModel.setSelectedTab(2) },
-                    text = { Text("Kuwa aad jeceshahay", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
+                    text = { Text("Favorites", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) }
                 )
             }
 
@@ -289,14 +290,14 @@ fun LibraryScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "Lama helin buug la magac ah" else "Ma jiraan buugaag PDF ah",
+                            text = if (searchQuery.isNotEmpty()) "No book found with this name" else "No PDF books",
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = if (searchQuery.isNotEmpty()) "Fadlan isku day inaad raadiso eray kale." else "Guji batoonka hoose si aad u soo dhoweyso buug maxalli ah.",
+                            text = if (searchQuery.isNotEmpty()) "Please try searching another word." else "Click the button below to import a local book.",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -308,7 +309,7 @@ fun LibraryScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(bottom = 80.dp)
                 ) {
-                    // 1. RECENT FILES CAROUSEL SECTION (Only on Dhammaan/All Tab & when Search Query is empty)
+                    // 1. RECENT FILES CAROUSEL SECTION (Only on All/All Tab & when Search Query is empty)
                     if (selectedTab == 0 && searchQuery.isEmpty() && recentPdfs.isNotEmpty()) {
                         item {
                             Column(
@@ -324,13 +325,13 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Kuwii ugu dambeeyay",
+                                        text = "Recently viewed",
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "${recentPdfs.size} buug",
+                                        text = "${recentPdfs.size} books",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -355,7 +356,7 @@ fun LibraryScreen(
                         }
                     }
 
-                    // 2. FOLDERS / CATEGORIES FILTER SECTION (Only on Dhammaan/All Tab & when Search is empty)
+                    // 2. FOLDERS / CATEGORIES FILTER SECTION (Only on All/All Tab & when Search is empty)
                     if (selectedTab == 0 && searchQuery.isEmpty()) {
                         item {
                             Column(
@@ -364,7 +365,7 @@ fun LibraryScreen(
                                     .padding(vertical = 4.dp)
                             ) {
                                 Text(
-                                    text = "Folders / Qaybaha",
+                                    text = "Folders / Categories",
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
@@ -376,12 +377,12 @@ fun LibraryScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.padding(vertical = 4.dp)
                                 ) {
-                                    // "Dhammaan" Folder Chip
+                                    // "All" Folder Chip
                                     item {
                                         FilterChip(
                                             selected = selectedCategory == null,
                                             onClick = { viewModel.setSelectedCategory(null) },
-                                            label = { Text("Dhammaan") },
+                                            label = { Text("All") },
                                             leadingIcon = {
                                                 Icon(
                                                     imageVector = Icons.Outlined.FolderSpecial,
@@ -414,7 +415,7 @@ fun LibraryScreen(
                                     item {
                                         AssistChip(
                                             onClick = { showCreateFolderDialog = true },
-                                            label = { Text("Folder Cusub") },
+                                            label = { Text("New Folder") },
                                             leadingIcon = {
                                                 Icon(
                                                     imageVector = Icons.Default.Add,
@@ -438,7 +439,7 @@ fun LibraryScreen(
                     // Header for the Document List
                     item {
                         Text(
-                            text = if (selectedCategory != null) "Buugaagta ku dhex jira: $selectedCategory" else "Dhammaan Buugaagta",
+                            text = if (selectedCategory != null) "Books in: $selectedCategory" else "All Books",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -471,7 +472,7 @@ fun LibraryScreen(
                                                     },
                                                     onFavoriteToggle = { viewModel.toggleFavorite(pdf) },
                                                     onShare = { sharePdf(context, pdf) },
-                                                    onDelete = { viewModel.deletePdf(pdf) },
+                                                    onDelete = { pdfToDelete = pdf },
                                                     onMoveToFolder = { pdfToMoveToFolder = pdf }
                                                 )
                                             }
@@ -494,7 +495,7 @@ fun LibraryScreen(
                                     },
                                     onFavoriteToggle = { viewModel.toggleFavorite(pdf) },
                                     onShare = { sharePdf(context, pdf) },
-                                    onDelete = { viewModel.deletePdf(pdf) },
+                                    onDelete = { pdfToDelete = pdf },
                                     onMoveToFolder = { pdfToMoveToFolder = pdf }
                                 )
                             }
@@ -512,14 +513,14 @@ fun LibraryScreen(
                 showCreateFolderDialog = false
                 folderNameInput = ""
             },
-            title = { Text("Abuur Folder Cusub", fontWeight = FontWeight.Bold) },
+            title = { Text("Create New Folder", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Ku qor magaca folder-ka aad rabto inaad abuurto si aad u kala nidaamiso buugaagtaada.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Enter the name of the folder you want to create to organize your books.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(
                         value = folderNameInput,
                         onValueChange = { folderNameInput = it },
-                        placeholder = { Text("Tusaale: Buugaagta Taariikhda") },
+                        placeholder = { Text("Example: History Books") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp)
@@ -537,7 +538,7 @@ fun LibraryScreen(
                     },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Abuur")
+                    Text("Create")
                 }
             },
             dismissButton = {
@@ -545,7 +546,7 @@ fun LibraryScreen(
                     showCreateFolderDialog = false
                     folderNameInput = ""
                 }) {
-                    Text("Ka laabo")
+                    Text("Cancel")
                 }
             },
             shape = RoundedCornerShape(24.dp)
@@ -560,14 +561,14 @@ fun LibraryScreen(
 
         AlertDialog(
             onDismissRequest = { pdfToMoveToFolder = null },
-            title = { Text("U rar Folder kale", fontWeight = FontWeight.Bold) },
+            title = { Text("Move to Folder", fontWeight = FontWeight.Bold) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Dooro folder-ka aad rabto inaad u rarto '${pdf.fileName}':",
+                        text = "Select the folder you want to move '${pdf.fileName}' to:",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -593,7 +594,7 @@ fun LibraryScreen(
                                 onClick = { selectedCategoryToMove = "" }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Folder dibadda ah (Default)", fontSize = 14.sp)
+                            Text("Default Folder", fontSize = 14.sp)
                         }
 
                         // Users dynamic categories
@@ -619,14 +620,14 @@ fun LibraryScreen(
 
                     // Text Field to create on-the-fly and move
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Ama u samee folder cusub:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Or create a new folder:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         OutlinedTextField(
                             value = customCategoryInput,
                             onValueChange = {
                                 customCategoryInput = it
                                 if (it.isNotBlank()) selectedCategoryToMove = it.trim()
                             },
-                            placeholder = { Text("Ku qor magac cusub...") },
+                            placeholder = { Text("Enter new name...") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp)
@@ -651,12 +652,12 @@ fun LibraryScreen(
                     },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Xaqiiji")
+                    Text("Confirm")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { pdfToMoveToFolder = null }) {
-                    Text("Ka laabo")
+                    Text("Cancel")
                 }
             },
             shape = RoundedCornerShape(24.dp)
@@ -664,16 +665,43 @@ fun LibraryScreen(
     }
 
     // SORTING DIALOG
+
+    // DELETE CONFIRMATION DIALOG
+    if (pdfToDelete != null) {
+        val pdf = pdfToDelete!!
+        AlertDialog(
+            onDismissRequest = { pdfToDelete = null },
+            title = { Text("Delete PDF", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to delete '${pdf.fileName}'? This action cannot be undone.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deletePdf(pdf)
+                        pdfToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("OK", color = MaterialTheme.colorScheme.onError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pdfToDelete = null }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
     if (showSortMenu) {
         AlertDialog(
             onDismissRequest = { showSortMenu = false },
-            title = { Text("Kala Hormari Buugaagta", fontWeight = FontWeight.Bold) },
+            title = { Text("Sort Books", fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val options = listOf(
-                        Triple(0, "A-Z (Magac)", Icons.AutoMirrored.Outlined.Sort),
-                        Triple(1, "Xilligii dhowaa (Taariikh)", Icons.Outlined.CalendarToday),
-                        Triple(2, "Mugga buugga (Xajmi)", Icons.Outlined.FilePresent)
+                        Triple(0, "A-Z (Name)", Icons.AutoMirrored.Outlined.Sort),
+                        Triple(1, "Recent (Date)", Icons.Outlined.CalendarToday),
+                        Triple(2, "Book Size", Icons.Outlined.FilePresent)
                     )
 
                     options.forEach { (index, title, icon) ->
@@ -715,7 +743,7 @@ fun LibraryScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showSortMenu = false }) {
-                    Text("Xidh")
+                    Text("Close")
                 }
             },
             shape = RoundedCornerShape(24.dp)
@@ -784,7 +812,7 @@ fun RecentPdfCard(
             Column(modifier = Modifier.fillMaxWidth()) {
                 val lastPage = pdf.lastPageRead
                 val total = pdf.totalPages
-                val progressText = if (total > 0) "Bogga ${lastPage + 1} ee $total" else "Bog dhowaan"
+                val progressText = if (total > 0) "Page ${lastPage + 1} of $total" else "Recent page"
                 val progressVal = if (total > 0) (lastPage + 1).toFloat() / total.toFloat() else 0f
 
                 Row(
@@ -919,7 +947,7 @@ fun ListPdfItem(
                     onDismissRequest = { showMenu = false }
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Ku rar Folder") },
+                        text = { Text("Move to Folder") },
                         onClick = {
                             showMenu = false
                             onMoveToFolder()
@@ -927,7 +955,7 @@ fun ListPdfItem(
                         leadingIcon = { Icon(Icons.Outlined.Folder, null, tint = MaterialTheme.colorScheme.primary) }
                     )
                     DropdownMenuItem(
-                        text = { Text("La wadaag (Share)") },
+                        text = { Text("Share") },
                         onClick = {
                             showMenu = false
                             onShare()
@@ -935,7 +963,7 @@ fun ListPdfItem(
                         leadingIcon = { Icon(Icons.Outlined.Share, null, tint = MaterialTheme.colorScheme.primary) }
                     )
                     DropdownMenuItem(
-                        text = { Text("Tirtir (Delete)") },
+                        text = { Text("Delete") },
                         onClick = {
                             showMenu = false
                             onDelete()
@@ -1023,7 +1051,7 @@ fun GridPdfItem(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Ku rar Folder") },
+                                text = { Text("Move to Folder") },
                                 onClick = {
                                     showMenu = false
                                     onMoveToFolder()
@@ -1031,7 +1059,7 @@ fun GridPdfItem(
                                 leadingIcon = { Icon(Icons.Outlined.Folder, null, tint = MaterialTheme.colorScheme.primary) }
                             )
                             DropdownMenuItem(
-                                text = { Text("La wadaag (Share)") },
+                                text = { Text("Share") },
                                 onClick = {
                                     showMenu = false
                                     onShare()
@@ -1039,7 +1067,7 @@ fun GridPdfItem(
                                 leadingIcon = { Icon(Icons.Outlined.Share, null, tint = MaterialTheme.colorScheme.primary) }
                             )
                             DropdownMenuItem(
-                                text = { Text("Tirtir (Delete)") },
+                                text = { Text("Delete") },
                                 onClick = {
                                     showMenu = false
                                     onDelete()
@@ -1110,10 +1138,10 @@ fun SecurityDialog(
         title = {
             Text(
                 text = when {
-                    isPinConfigured && step == 0 -> "Amniga App-ka"
-                    step == 1 -> "Samee PIN-ka"
-                    step == 2 -> "Xaqiiji PIN-ka"
-                    else -> "Geli PIN-ka hadda"
+                    isPinConfigured && step == 0 -> "App Security"
+                    step == 1 -> "Set PIN"
+                    step == 2 -> "Confirm PIN"
+                    else -> "Enter PIN"
                 },
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -1127,7 +1155,7 @@ fun SecurityDialog(
             ) {
                 if (isPinConfigured && step == 0) {
                     Text(
-                        text = "PIN-ka App-ka hadda waa uu shaqeynayaa. Dukumentiyadaada waa ay badbaadsan yihiin.",
+                        text = "App PIN is currently active. Your documents are safe.",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1151,8 +1179,8 @@ fun SecurityDialog(
                                 error = null
                             }
                         },
-                        label = { Text("Geli PIN-ka si aad u damiso") },
-                        placeholder = { Text("4 lambar") },
+                        label = { Text("Enter PIN to disable") },
+                        placeholder = { Text("4 digits") },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -1163,7 +1191,7 @@ fun SecurityDialog(
                     )
                 } else if (step == 1) {
                     Text(
-                        text = "Fadlan geli 4-digit PIN aad ku xireyso app-ka.",
+                        text = "Please enter a 4-digit PIN to lock the app.",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1176,8 +1204,8 @@ fun SecurityDialog(
                                 error = null
                             }
                         },
-                        label = { Text("PIN Cusub") },
-                        placeholder = { Text("4 lambar") },
+                        label = { Text("New PIN") },
+                        placeholder = { Text("4 digits") },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -1188,7 +1216,7 @@ fun SecurityDialog(
                     )
                 } else if (step == 2) {
                     Text(
-                        text = "Ku celi PIN-ka hadda aad qortay si aad u xaqiijiso.",
+                        text = "Repeat the PIN you just entered to confirm.",
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1210,8 +1238,8 @@ fun SecurityDialog(
                                 error = null
                             }
                         },
-                        label = { Text("Xaqiiji PIN") },
-                        placeholder = { Text("4 lambar") },
+                        label = { Text("Confirm PIN") },
+                        placeholder = { Text("4 digits") },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -1231,21 +1259,21 @@ fun SecurityDialog(
                             onDisablePin()
                             onDismiss()
                         } else {
-                            error = "PIN-ka aad gelisay waa khalad!"
+                            error = "The PIN you entered is incorrect!"
                             currentPinInput = ""
                         }
                     } else if (step == 1) {
                         if (pinText.length == 4) {
                             step = 2
                         } else {
-                            error = "Fadlan qor 4 lambar."
+                            error = "Please enter 4 digits."
                         }
                     } else if (step == 2) {
                         if (confirmPinText == pinText) {
                             onSetPin(pinText)
                             onDismiss()
                         } else {
-                            error = "PIN-nada aad qortay isku mid ma aha!"
+                            error = "The PINs you entered do not match!"
                             confirmPinText = ""
                         }
                     }
@@ -1269,7 +1297,7 @@ fun SecurityDialog(
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Ka laabo")
+                Text("Cancel")
             }
         },
         shape = RoundedCornerShape(24.dp)

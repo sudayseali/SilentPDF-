@@ -73,7 +73,7 @@ fun PinLockScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Fadlan geli 4-digit PIN-ka si aad u furto app-ka",
+            text = "Please enter 4-digit PIN to unlock the app",
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -92,7 +92,7 @@ fun PinLockScreen(
                     if (pinInput.length == 4) {
                         val isCorrect = viewModel.unlockApp(pinInput)
                         if (!isCorrect) {
-                            errorMessage = "PIN-ka aad gelisay waa khalad!"
+                            errorMessage = "Incorrect PIN entered!"
                             pinInput = ""
                         }
                     }

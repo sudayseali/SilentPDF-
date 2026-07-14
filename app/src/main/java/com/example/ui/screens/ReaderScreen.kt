@@ -188,7 +188,7 @@ fun ReaderScreen(
         if (isGranted) {
             viewModel.startVoiceRecording(context)
         } else {
-            android.widget.Toast.makeText(context, "Fadlan oggolow fasaxa Microphone-ka si aad cod u duubto.", android.widget.Toast.LENGTH_LONG).show()
+            android.widget.Toast.makeText(context, "Please grant Microphone permission to record audio.", android.widget.Toast.LENGTH_LONG).show()
         }
     }
 
@@ -230,7 +230,7 @@ fun ReaderScreen(
                     horizontalArrangement = Arrangement.Start
                 ) {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ka laabo")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel")
                     }
                 }
 
@@ -254,7 +254,7 @@ fun ReaderScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "Faylkaan waa la xidhay",
+                    text = "This file is locked",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -263,7 +263,7 @@ fun ReaderScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Fadlan geli password-ka saxda ah si aad u furto dukumentigan.",
+                    text = "Please enter the correct password to open this document.",
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -275,7 +275,7 @@ fun ReaderScreen(
                 OutlinedTextField(
                     value = passwordInput,
                     onValueChange = { passwordInput = it },
-                    placeholder = { Text("Geli password-ka...") },
+                    placeholder = { Text("Enter password...") },
                     visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
                         IconButton(onClick = { passwordVisible = !passwordVisible }) {
@@ -319,7 +319,7 @@ fun ReaderScreen(
                 ) {
                     Icon(Icons.Default.VpnKey, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Fura Dukumentiga", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Open Document", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
@@ -339,7 +339,7 @@ fun ReaderScreen(
                             .padding(16.dp)
                     ) {
                         Text(
-                            text = "Hagaha Buugga",
+                            text = "Book Outline",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -366,7 +366,7 @@ fun ReaderScreen(
                             Tab(
                                 selected = selectedDrawerTab == 2,
                                 onClick = { selectedDrawerTab = 2 },
-                                text = { Text("Raadi", fontSize = 11.sp) }
+                                text = { Text("Search", fontSize = 11.sp) }
                             )
                             Tab(
                                 selected = selectedDrawerTab == 3,
@@ -390,7 +390,7 @@ fun ReaderScreen(
                                             )
                                             Spacer(modifier = Modifier.height(12.dp))
                                             Text(
-                                                text = "Ma jiraan qoraallo (notes) aad ku dartay buuggan.",
+                                                text = "No notes added to this book.",
                                                 fontSize = 13.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center
@@ -424,7 +424,7 @@ fun ReaderScreen(
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = "Bogga ${note.pageNumber + 1}",
+                                                            text = "Page ${note.pageNumber + 1}",
                                                             fontSize = 12.sp,
                                                             fontWeight = FontWeight.Bold,
                                                             color = MaterialTheme.colorScheme.primary
@@ -437,7 +437,7 @@ fun ReaderScreen(
                                                         ) {
                                                             Icon(
                                                                 imageVector = Icons.Outlined.Delete,
-                                                                contentDescription = "Tirtir",
+                                                                contentDescription = "Delete",
                                                                 tint = MaterialTheme.colorScheme.error,
                                                                 modifier = Modifier.size(16.dp)
                                                             )
@@ -468,7 +468,7 @@ fun ReaderScreen(
                                                 Icon(Icons.Outlined.ImportContacts, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                                                 Spacer(modifier = Modifier.height(12.dp))
                                                 Text(
-                                                    text = "Ma jiraan cutubyo la helay",
+                                                    text = "No chapters found",
                                                     fontSize = 14.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center
@@ -531,7 +531,7 @@ fun ReaderScreen(
                                                 Icon(Icons.Outlined.BookmarkBorder, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                                                 Spacer(modifier = Modifier.height(12.dp))
                                                 Text(
-                                                    text = "Ma jiraan bogag aad calaamadsatay dhowaan.",
+                                                    text = "No recently bookmarked pages.",
                                                     fontSize = 13.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center
@@ -563,14 +563,14 @@ fun ReaderScreen(
                                                     )
                                                     Spacer(modifier = Modifier.width(12.dp))
                                                     Text(
-                                                        text = "Bogga ${bookmark.pageNumber + 1}",
+                                                        text = "Page ${bookmark.pageNumber + 1}",
                                                         fontSize = 14.sp,
                                                         fontWeight = if (currentPage == bookmark.pageNumber) FontWeight.Bold else FontWeight.Normal,
                                                         color = MaterialTheme.colorScheme.onSurface,
                                                         modifier = Modifier.weight(1f)
                                                     )
                                                     IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
-                                                        Icon(Icons.Default.Delete, contentDescription = "Tirtir", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
                                                     }
                                                 }
                                             }
@@ -583,12 +583,12 @@ fun ReaderScreen(
                                         OutlinedTextField(
                                             value = searchInPdfQuery,
                                             onValueChange = { viewModel.searchInPdf(it) },
-                                            placeholder = { Text("Eray ku raadi buugga...", fontSize = 13.sp) },
+                                            placeholder = { Text("Search word in book...", fontSize = 13.sp) },
                                             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
                                             trailingIcon = {
                                                 if (searchInPdfQuery.isNotEmpty()) {
                                                     IconButton(onClick = { viewModel.searchInPdf("") }) {
-                                                        Icon(Icons.Default.Close, contentDescription = "Eber", modifier = Modifier.size(16.dp))
+                                                        Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                                                     }
                                                 }
                                             },
@@ -610,7 +610,7 @@ fun ReaderScreen(
                                         } else if (searchInPdfQuery.isEmpty()) {
                                             Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = "Ku qor eray barta sare si aad uga raadiso dhammaan boggaga buugga.",
+                                                    text = "Type a word above to search across all pages.",
                                                     fontSize = 12.sp,
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     textAlign = TextAlign.Center
@@ -619,7 +619,7 @@ fun ReaderScreen(
                                         } else if (searchInPdfResults.isEmpty()) {
                                             Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
                                                 Text(
-                                                    text = "Wax natiijo ah lama helin.",
+                                                    text = "No results found.",
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Medium,
                                                     color = MaterialTheme.colorScheme.error,
@@ -628,7 +628,7 @@ fun ReaderScreen(
                                             }
                                         } else {
                                             Text(
-                                                text = "La helay ${searchInPdfResults.size} meelood",
+                                                text = "Found in ${searchInPdfResults.size} places",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.primary,
@@ -658,13 +658,13 @@ fun ReaderScreen(
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
                                                                 Text(
-                                                                    text = "Bogga ${result.pageNumber + 1}",
+                                                                    text = "Page ${result.pageNumber + 1}",
                                                                     fontSize = 11.sp,
                                                                     fontWeight = FontWeight.Bold,
                                                                     color = MaterialTheme.colorScheme.primary
                                                                 )
                                                                 Text(
-                                                                    text = "${result.occurrencesCount} jeer",
+                                                                    text = "${result.occurrencesCount} times",
                                                                     fontSize = 9.sp,
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                 )
@@ -709,7 +709,7 @@ fun ReaderScreen(
                             },
                             navigationIcon = {
                                 IconButton(onClick = onNavigateBack) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Ka laabo")
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel")
                                 }
                             },
                             actions = {
@@ -718,18 +718,18 @@ fun ReaderScreen(
                                     selectedDrawerTab = 2 // Switch directly to search tab
                                     coroutineScope.launch { drawerState.open() }
                                 }) {
-                                    Icon(Icons.Default.Search, contentDescription = "Ku dhex raadi erayo", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.Search, contentDescription = "Search text", tint = MaterialTheme.colorScheme.primary)
                                 }
                                 
                                 IconButton(onClick = { isDrawingMode = !isDrawingMode }) {
                                     Icon(
                                         imageVector = Icons.Default.Edit,
-                                        contentDescription = "Sawir / Qor",
+                                        contentDescription = "Draw / Write",
                                         tint = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
                                 IconButton(onClick = { viewModel.toggleTrueDarkMode() }) {
-                                    Icon(Icons.Outlined.Contrast, contentDescription = "Madow / Caddaan")
+                                    Icon(Icons.Outlined.Contrast, contentDescription = "Black / White")
                                 }
                                 val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                 IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
@@ -744,11 +744,11 @@ fun ReaderScreen(
                                 }
                                 Box {
                                     IconButton(onClick = { showMoreMenu = true }) {
-                                        Icon(Icons.Default.MoreVert, contentDescription = "Dheeraad")
+                                        Icon(Icons.Default.MoreVert, contentDescription = "More")
                                     }
                                     DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
                                          DropdownMenuItem(
-                                             text = { Text("Ku dar/Beddel Qoraal (Note)") },
+                                             text = { Text("Add/Edit Note") },
                                              leadingIcon = { Icon(Icons.Default.Edit, null) },
                                              onClick = {
                                                  val existing = currentNotes.find { it.pageNumber == currentPage }
@@ -758,7 +758,7 @@ fun ReaderScreen(
                                              }
                                          )
                                         DropdownMenuItem(
-                                            text = { Text("Toos u weyneey (Fullscreen)") },
+                                            text = { Text("Fullscreen") },
                                             leadingIcon = { Icon(Icons.Default.Fullscreen, null) },
                                             onClick = {
                                                 isFullScreen = true
@@ -766,7 +766,7 @@ fun ReaderScreen(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Daabac (Print)") },
+                                            text = { Text("Print") },
                                             leadingIcon = { Icon(Icons.Default.Print, null) },
                                             onClick = {
                                                 currentPdf?.let { printPdf(context, it) }
@@ -774,7 +774,7 @@ fun ReaderScreen(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Faahfaahin (Details)") },
+                                            text = { Text("Details") },
                                             leadingIcon = { Icon(Icons.Default.Info, null) },
                                             onClick = {
                                                 showInfoDialog = true
@@ -782,7 +782,7 @@ fun ReaderScreen(
                                             }
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Duub Cod (Voice Note)") },
+                                            text = { Text("Voice Note") },
                                             leadingIcon = { Icon(Icons.Default.Mic, null) },
                                             onClick = {
                                                 showVoiceRecorderDialog = true
@@ -834,7 +834,7 @@ fun ReaderScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Brush,
-                                                        contentDescription = "Qalin",
+                                                        contentDescription = "Pen",
                                                         tint = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
@@ -860,7 +860,7 @@ fun ReaderScreen(
                                                 ) {
                                                     Icon(
                                                         Icons.Default.AutoFixHigh,
-                                                        contentDescription = "Tirtire",
+                                                        contentDescription = "Eraser",
                                                         tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
@@ -894,7 +894,7 @@ fun ReaderScreen(
                                                     viewModel.undoLastStroke(uri, currentPage)
                                                 }
                                             }) {
-                                                Icon(Icons.Default.Undo, contentDescription = "Ka laabo qoraalka")
+                                                Icon(Icons.Default.Undo, contentDescription = "Undo drawing")
                                             }
                                         }
 
@@ -903,7 +903,7 @@ fun ReaderScreen(
                                             modifier = Modifier.fillMaxWidth(),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.LineWeight, contentDescription = "Xajmiga", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Icon(Icons.Default.LineWeight, contentDescription = "Size", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Slider(
                                                 value = strokeWidth,
@@ -966,12 +966,12 @@ fun ReaderScreen(
                                             shape = CircleShape
                                         )
                                     ) {
-                                        Icon(Icons.Default.ChevronLeft, contentDescription = "U gudub boggii hore")
+                                        Icon(Icons.Default.ChevronLeft, contentDescription = "Go to previous page")
                                     }
 
                                     var showJumpDialog by remember { mutableStateOf(false) }
                                     Text(
-                                        text = "Bogga ${currentPage + 1} ee $pageCount",
+                                        text = "Page ${currentPage + 1} of $pageCount",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary,
@@ -987,14 +987,14 @@ fun ReaderScreen(
                                         var jumpText by remember { mutableStateOf("") }
                                         AlertDialog(
                                             onDismissRequest = { showJumpDialog = false },
-                                            title = { Text("U bood Bog", fontWeight = FontWeight.Bold) },
+                                            title = { Text("Jump to Page", fontWeight = FontWeight.Bold) },
                                             text = {
                                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Text("Ku qor lambarka bogga aad rabto inaad u booddo (1 ilaa $pageCount):", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                    Text("Enter the page number to jump to (1 to $pageCount):", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                                     OutlinedTextField(
                                                         value = jumpText,
                                                         onValueChange = { jumpText = it.filter { char -> char.isDigit() } },
-                                                        label = { Text("Nambarka Bogga") },
+                                                        label = { Text("Page Number") },
                                                         singleLine = true,
                                                         modifier = Modifier.fillMaxWidth(),
                                                         shape = RoundedCornerShape(12.dp)
@@ -1012,12 +1012,12 @@ fun ReaderScreen(
                                                     },
                                                     shape = RoundedCornerShape(12.dp)
                                                 ) {
-                                                    Text("Haa")
+                                                    Text("Yes")
                                                 }
                                             },
                                             dismissButton = {
                                                 TextButton(onClick = { showJumpDialog = false }) {
-                                                    Text("Ka laabo")
+                                                    Text("Cancel")
                                                 }
                                             },
                                             shape = RoundedCornerShape(24.dp)
@@ -1032,7 +1032,7 @@ fun ReaderScreen(
                                             shape = CircleShape
                                         )
                                     ) {
-                                        Icon(Icons.Default.ChevronRight, contentDescription = "U gudub boga xiga")
+                                        Icon(Icons.Default.ChevronRight, contentDescription = "Go to next page")
                                     }
                                 }
                             }
@@ -1057,22 +1057,22 @@ fun ReaderScreen(
                     if (showInfoDialog) {
                         AlertDialog(
                             onDismissRequest = { showInfoDialog = false },
-                            title = { Text("Faahfaahinta Buugga", fontWeight = FontWeight.Bold) },
+                            title = { Text("Book Details", fontWeight = FontWeight.Bold) },
                             text = {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     currentPdf?.let {
-                                        Text("Magaca: ${it.fileName}", fontWeight = FontWeight.Bold)
-                                        Text("Mugga: ${formatFileSize(it.fileSize)}")
-                                        Text("Bogagga: ${it.totalPages}")
+                                        Text("Name: ${it.fileName}", fontWeight = FontWeight.Bold)
+                                        Text("Size: ${formatFileSize(it.fileSize)}")
+                                        Text("Pages: ${it.totalPages}")
                                         if (it.category != null) {
-                                            Text("Folder: ${it.category}")
+                                            Text("Category: ${it.category}")
                                         }
-                                    } ?: Text("Waa la soo raryaa...")
+                                    } ?: Text("Loading...")
                                 }
                             },
                             confirmButton = {
                                 Button(onClick = { showInfoDialog = false }, shape = RoundedCornerShape(12.dp)) {
-                                    Text("Xidh")
+                                    Text("Close")
                                 }
                             },
                             shape = RoundedCornerShape(24.dp)
@@ -1159,7 +1159,7 @@ fun ReaderScreen(
                             Box(modifier = layerModifier) {
                                 Image(
                                     bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "Bogga PDF",
+                                    contentDescription = "PDF Page",
                                     colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -1274,7 +1274,7 @@ fun ReaderScreen(
                                             )
                                             Column(modifier = Modifier.weight(1f)) {
                                                 Text(
-                                                    text = "Qoraal Bogga",
+                                                    text = "Page Note",
                                                     fontSize = 11.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.primary
@@ -1292,7 +1292,7 @@ fun ReaderScreen(
                             }
                         }
                     } else if (pageCount > 0) {
-                        Text("Ma aanan rari karin boggan", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        Text("Could not load this page", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1304,7 +1304,7 @@ fun ReaderScreen(
             onDismissRequest = { showNoteDialog = false },
             title = {
                 Text(
-                    text = "Qoraalka Bogga ${currentPage + 1}",
+                    text = "Note for Page ${currentPage + 1}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.primary
@@ -1315,8 +1315,8 @@ fun ReaderScreen(
                     OutlinedTextField(
                         value = noteInputText,
                         onValueChange = { noteInputText = it },
-                        label = { Text("Qoraalkaaga") },
-                        placeholder = { Text("Halkan ku qor qoraal gaar ah...") },
+                        label = { Text("Your Note") },
+                        placeholder = { Text("Write a specific note here...") },
                         modifier = Modifier.fillMaxWidth().height(120.dp),
                         shape = RoundedCornerShape(12.dp)
                     )
@@ -1343,7 +1343,7 @@ fun ReaderScreen(
                     },
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Kaydi")
+                    Text("Save")
                 }
             },
             dismissButton = {
@@ -1357,11 +1357,11 @@ fun ReaderScreen(
                             },
                             colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
-                            Text("Tirtir")
+                            Text("Delete")
                         }
                     }
                     TextButton(onClick = { showNoteDialog = false }) {
-                        Text("Ka laabo")
+                        Text("Cancel")
                     }
                 }
             },
@@ -1384,7 +1384,7 @@ fun ReaderScreen(
             },
             title = {
                 Text(
-                    text = "Duubista Codka - Bogga ${currentPage + 1}",
+                    text = "Voice Note - Page ${currentPage + 1}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp,
                     color = MaterialTheme.colorScheme.primary
@@ -1438,7 +1438,7 @@ fun ReaderScreen(
                         )
 
                         Text(
-                            text = "Codkaaga ayaa hadda la duubayaa...",
+                            text = "Recording your voice now...",
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
@@ -1449,14 +1449,14 @@ fun ReaderScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Icon(Icons.Default.Stop, contentDescription = "Jooji", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Stop, contentDescription = "Stop", modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Dhegeyso & Keydi")
+                            Text("Listen & Save")
                         }
                     } else {
                         if (audioPath != null) {
                             Text(
-                                text = "Boggan wuxuu horey u leeyahay cod duuban:",
+                                text = "This page already has a voice note:",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
                                 modifier = Modifier.align(Alignment.Start)
@@ -1479,7 +1479,7 @@ fun ReaderScreen(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 4.dp))
                             
                             Text(
-                                text = "Ma rabtaa inaad dib u duubto codka?",
+                                text = "Do you want to record again?",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1499,7 +1499,7 @@ fun ReaderScreen(
                             }
 
                             Text(
-                                text = "Riix badhanka hoose si aad u bilowdo duubista codka.",
+                                text = "Press the button below to start recording voice.",
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
@@ -1524,7 +1524,7 @@ fun ReaderScreen(
                         ) {
                             Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (audioPath != null) "Duub Cod Cusub" else "Bilow Duubista")
+                            Text(if (audioPath != null) "Record New Voice Note" else "Start Recording")
                         }
                     }
                 }
@@ -1539,7 +1539,7 @@ fun ReaderScreen(
                         showVoiceRecorderDialog = false 
                     }
                 ) {
-                    Text("Xidh")
+                    Text("Close")
                 }
             },
             shape = RoundedCornerShape(24.dp)
@@ -1609,13 +1609,13 @@ fun VoiceNotePlayer(filePath: String, onDelete: () -> Unit) {
             }) {
                 Icon(
                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = "Garaac / Hakaji",
+                    contentDescription = "Play / Pause",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
 
             Column(modifier = Modifier.weight(1f)) {
-                Text("Codka Bogga", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text("Page Voice Note", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Slider(
                     value = position,
                     onValueChange = {
@@ -1653,7 +1653,7 @@ fun VoiceNotePlayer(filePath: String, onDelete: () -> Unit) {
                 isPlaying = false
                 onDelete()
             }) {
-                Icon(Icons.Default.Delete, contentDescription = "Tirtir", tint = MaterialTheme.colorScheme.error)
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
             }
         }
     }

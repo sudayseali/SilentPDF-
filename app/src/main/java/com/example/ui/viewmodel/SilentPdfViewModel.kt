@@ -452,13 +452,13 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             } catch (e: SecurityException) {
                 Log.e("SilentPdfViewModel", "Encrypted PDF file requiring password", e)
                 _isPasswordProtected.value = true
-                _pdfOpeningError.value = "Fadlan geli Password-ka si aad u furto buuggan"
+                _pdfOpeningError.value = "Please enter Password to open this book"
                 _pageCount.value = 0
                 _currentPage.value = 0
                 _currentPageBitmap.value = null
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to load PDF doc in engine", e)
-                _pdfOpeningError.value = "Ma aanan furi karin buuggan: ${e.localizedMessage}"
+                _pdfOpeningError.value = "Could not open this book: ${e.localizedMessage}"
             } finally {
                 _isPdfLoading.value = false
             }
