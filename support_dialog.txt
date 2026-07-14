@@ -1,0 +1,41 @@
+
+    // SUPPORT DIALOG
+    if (showSupportDialog) {
+        AlertDialog(
+            onDismissRequest = { showSupportDialog = false },
+            title = { Text("Caawinaad / Support", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Haddii aad la kulanto wax cilad ah, fadlan nagala soo xiriir WhatsApp.")
+                    Text(
+                        "Fiiro gaar ah: Kaliya fariin (chat) ayaa la ogol yahay. Wicitanka codka iyo muqaalka (Voice/Video calls) lama ogola.",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSupportDialog = false
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.data = Uri.parse("https://wa.me/252657864155?text=Asc,%20waxaan%20u%20baahanahay%20caawinaad%20ku%20saabsan%20SilentPDF%20app-ka.")
+                        try {
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "WhatsApp is not installed.", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("WhatsApp Chat")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSupportDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }

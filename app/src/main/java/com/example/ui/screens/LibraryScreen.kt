@@ -104,6 +104,7 @@ fun LibraryScreen(
     var showSortMenu by remember { mutableStateOf(false) }
     val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     var showSecurityDialog by remember { mutableStateOf(false) }
+    var showSupportDialog by remember { mutableStateOf(false) }
 
     // Activity launcher for selecting PDF file locally
     val filePickerLauncher = rememberLauncherForActivityResult(
@@ -180,6 +181,13 @@ fun LibraryScreen(
                             imageVector = if (isPinConfigured) Icons.Default.Lock else Icons.Outlined.Lock,
                             contentDescription = "Security Settings",
                             tint = if (isPinConfigured) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = { showSupportDialog = true }) {
+                        Icon(
+                            imageVector = Icons.Outlined.SupportAgent,
+                            contentDescription = "Support",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                     IconButton(onClick = { showSortMenu = true }) {
@@ -665,6 +673,47 @@ fun LibraryScreen(
     }
 
     // SORTING DIALOG
+
+    // SUPPORT DIALOG
+    if (showSupportDialog) {
+        AlertDialog(
+            onDismissRequest = { showSupportDialog = false },
+            title = { Text("Help / Support", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("If you encounter any issues, please contact us via WhatsApp.")
+                    Text(
+                        "Note: Only chat messages are allowed. Voice and video calls are not permitted.",
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSupportDialog = false
+                        val intent = Intent(Intent.ACTION_VIEW)
+                        intent.data = Uri.parse("https://wa.me/252657864155?text=Hello,%20I%20need%20help%20with%20the%20SilentPDF%20app.")
+                        try {
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            android.widget.Toast.makeText(context, "WhatsApp is not installed.", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("WhatsApp Chat")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSupportDialog = false }) {
+                    Text("Cancel")
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 
     // DELETE CONFIRMATION DIALOG
     if (pdfToDelete != null) {
