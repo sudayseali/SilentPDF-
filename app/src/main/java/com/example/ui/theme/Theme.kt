@@ -7,41 +7,42 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
 private val DarkColorScheme = darkColorScheme(
-    primary = DarkSagePrimary,
-    onPrimary = DarkSageOnPrimary,
-    primaryContainer = DarkSagePrimaryContainer,
-    onPrimaryContainer = DarkSageOnPrimaryContainer,
-    background = DarkAlabasterBackground,
-    onBackground = DarkSlateOnBackground,
-    surface = DarkSandSurface,
-    onSurface = DarkSlateOnSurface,
-    surfaceVariant = DarkSandSurfaceVariant,
-    onSurfaceVariant = DarkSlateOnSurfaceVariant,
-    outline = DarkSageBorder
+    primary = PremiumPrimary,
+    onPrimary = PremiumOnPrimary,
+    primaryContainer = PremiumPrimaryContainer,
+    onPrimaryContainer = PremiumOnPrimaryContainer,
+    background = PremiumBackground,
+    onBackground = PremiumTextPrimary,
+    surface = PremiumSurface,
+    onSurface = PremiumTextPrimary,
+    surfaceVariant = PremiumSurfaceVariant,
+    onSurfaceVariant = PremiumTextSecondary,
+    outline = PremiumBorder
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = SagePrimary,
-    onPrimary = SageOnPrimary,
-    primaryContainer = SagePrimaryContainer,
-    onPrimaryContainer = SageOnPrimaryContainer,
-    background = AlabasterBackground,
-    onBackground = SlateOnBackground,
-    surface = SandSurface,
-    onSurface = SlateOnSurface,
-    surfaceVariant = SandSurfaceVariant,
-    onSurfaceVariant = SlateOnSurfaceVariant,
-    outline = SageBorder
+    primary = PremiumPrimary,
+    onPrimary = PremiumOnPrimary,
+    primaryContainer = PremiumPrimaryContainer,
+    onPrimaryContainer = PremiumOnPrimaryContainer,
+    background = PremiumBackground,
+    onBackground = PremiumTextPrimary,
+    surface = PremiumSurface,
+    onSurface = PremiumTextPrimary,
+    surfaceVariant = PremiumSurfaceVariant,
+    onSurfaceVariant = PremiumTextSecondary,
+    outline = PremiumBorder
 )
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // We disable dynamicColor by default to guarantee our beautiful "Natural Tones" signature palette is shown
+    darkTheme: Boolean = true, // Enforce the premium dark signature style consistently
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    // We always use the dark scheme to preserve the requested premium aesthetic,
+    // protecting user eyes with the deep-black layout.
+    val colorScheme = DarkColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
