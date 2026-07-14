@@ -50,10 +50,30 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _selectedCategory = MutableStateFlow<String?>(null)
     val selectedCategory: StateFlow<String?> = _selectedCategory
 
+    private val customCategoriesPref = application.getSharedPreferences("app_custom_categories", android.content.Context.MODE_PRIVATE)
+
+    private val _customCategories = MutableStateFlow<Set<String>>(
+        customCategoriesPref.getStringSet("categories", emptySet()) ?: emptySet()
+    )
+
     // Get list of unique categories/folders created by user
-    val allCategories: StateFlow<List<String>> = repository.allPdfsByName
-        .map { pdfs -> pdfs.mapNotNull { it.category }.distinct().sorted() }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val allCategories: StateFlow<List<String>> = combine(
+        repository.allPdfsByName,
+        _customCategories
+    ) { pdfs, custom ->
+        val fromPdfs = pdfs.mapNotNull { it.category }
+        (fromPdfs + custom).distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun createCategory(category: String) {
+        val trimmed = category.trim()
+        if (trimmed.isNotBlank()) {
+            val updated = _customCategories.value + trimmed
+            _customCategories.value = updated
+            customCategoriesPref.edit().putStringSet("categories", updated).apply()
+            setSelectedCategory(trimmed)
+        }
+    }
 
     // View Settings (True Dark Mode, Grid/List view, Horizontal vs Vertical scrolling)
     private val _isTrueDarkMode = MutableStateFlow(false)
@@ -154,7 +174,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         val pdfDrawings = currentDrawings[pdfUri]?.toMutableMap() ?: mutableMapOf()
         val pageStrokes = pdfDrawings[page]?.toMutableList() ?: mutableListOf()
         if (pageStrokes.isNotEmpty()) {
-            pageStrokes.removeLast()
+            pageStrokes.removeAt(pageStrokes.lastIndex)
             pdfDrawings[page] = pageStrokes
             currentDrawings[pdfUri] = pdfDrawings
             _pageDrawings.value = currentDrawings
@@ -186,16 +206,26 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isAppLocked = MutableStateFlow(false)
     val isAppLocked: StateFlow<Boolean> = _isAppLocked
 
+    private var mediaRecorder: android.media.MediaRecorder? = null
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording
+
+    private val _recordingSeconds = MutableStateFlow(0)
+    val recordingSeconds: StateFlow<Int> = _recordingSeconds
+
+    private var recordingFile: java.io.File? = null
+    private var recordingJob: kotlinx.coroutines.Job? = null
+
     init {
         // Check if an App PIN is set
         val savedPin = securityPrefs.getString("app_pin", null)
         if (!savedPin.isNullOrBlank()) {
             _isPinConfigured.value = true
             _isAppLocked.value = true
+        } else {
+            // Scan files on startup to populate library items if not locked
+            triggerScan()
         }
-        
-        // Scan files on startup to populate library items
-        triggerScan()
     }
 
     fun verifyPin(pin: String): Boolean {
@@ -206,6 +236,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     fun unlockApp(pin: String): Boolean {
         if (verifyPin(pin)) {
             _isAppLocked.value = false
+            triggerScan()
             return true
         }
         return false
@@ -234,6 +265,18 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun removeNote(noteId: Long) {
         viewModelScope.launch {
+            val note = currentNotes.value.find { it.id == noteId }
+            if (note != null && note.noteText.startsWith("[audio:")) {
+                try {
+                    val filePath = note.noteText.removePrefix("[audio:").removeSuffix("]")
+                    val file = java.io.File(filePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    Log.e("SilentPdfViewModel", "Error deleting voice note file", e)
+                }
+            }
             repository.removeNote(noteId)
         }
     }
@@ -241,8 +284,89 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     fun removeNoteForPage(page: Int) {
         val pdf = _currentPdf.value ?: return
         viewModelScope.launch {
+            val note = currentNotes.value.find { it.pageNumber == page }
+            if (note != null && note.noteText.startsWith("[audio:")) {
+                try {
+                    val filePath = note.noteText.removePrefix("[audio:").removeSuffix("]")
+                    val file = java.io.File(filePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                } catch (e: Exception) {
+                    Log.e("SilentPdfViewModel", "Error deleting voice note file for page", e)
+                }
+            }
             repository.removeNoteForPage(pdf.uriString, page)
         }
+    }
+
+    fun startVoiceRecording(context: android.content.Context) {
+        val pdf = _currentPdf.value ?: return
+        try {
+            val dir = java.io.File(context.filesDir, "voice_notes").apply { mkdirs() }
+            val file = java.io.File(dir, "voice_${System.currentTimeMillis()}.mp4")
+            recordingFile = file
+            
+            val attributionContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                context.createAttributionContext("voice_notes")
+            } else {
+                context
+            }
+
+            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                android.media.MediaRecorder(attributionContext)
+            } else {
+                @Suppress("DEPRECATION")
+                android.media.MediaRecorder()
+            }
+            
+            recorder.apply {
+                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                setOutputFile(file.absolutePath)
+                prepare()
+                start()
+            }
+            
+            mediaRecorder = recorder
+            _isRecording.value = true
+            _recordingSeconds.value = 0
+            
+            recordingJob = viewModelScope.launch {
+                while (_isRecording.value) {
+                    kotlinx.coroutines.delay(1000)
+                    _recordingSeconds.value += 1
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SilentPdfViewModel", "Failed to start audio recording", e)
+        }
+    }
+
+    fun stopVoiceRecording() {
+        if (!_isRecording.value) return
+        try {
+            mediaRecorder?.apply {
+                stop()
+                release()
+            }
+        } catch (e: Exception) {
+            Log.e("SilentPdfViewModel", "Error stopping MediaRecorder", e)
+        } finally {
+            mediaRecorder = null
+            _isRecording.value = false
+            recordingJob?.cancel()
+            recordingJob = null
+        }
+        
+        val file = recordingFile
+        val pdf = _currentPdf.value
+        if (file != null && file.exists() && pdf != null) {
+            val page = _currentPage.value
+            addOrUpdateNote(page, "[audio:${file.absolutePath}]")
+        }
+        recordingFile = null
     }
 
     fun triggerScan() {
@@ -321,6 +445,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 
                 // Dynamically fetch outline/table of contents on a background thread
                 extractPdfOutline()
+                
+                // Cache plain text pages for AI capabilities
+                cachePdfText(Uri.parse(pdf.uriString))
 
             } catch (e: SecurityException) {
                 Log.e("SilentPdfViewModel", "Encrypted PDF file requiring password", e)
@@ -349,6 +476,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         _pdfSearchQuery.value = ""
         _pdfSearchResults.value = emptyList()
         _pdfOutline.value = emptyList()
+        _openedPdfTextPages.value = emptyList()
     }
 
     fun jumpToPage(pageIndex: Int, targetWidth: Int = 1080) {
@@ -401,7 +529,12 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             }
             _isSearchingInPdf.value = true
             try {
-                val results = textSearcher.search(Uri.parse(pdf.uriString), query)
+                val cached = _openedPdfTextPages.value
+                val results = if (cached.isNotEmpty()) {
+                    textSearcher.searchCached(cached, query)
+                } else {
+                    textSearcher.search(Uri.parse(pdf.uriString), query)
+                }
                 _pdfSearchResults.value = results
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
@@ -443,8 +576,23 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+        private val _openedPdfTextPages = MutableStateFlow<List<String>>(emptyList())
+
+    private fun cachePdfText(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                _openedPdfTextPages.value = textSearcher.getPagesText(uri)
+            } catch (e: Exception) {
+                Log.e("SilentPdfViewModel", "Failed to cache PDF text pages", e)
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         renderEngine.closeDocument()
+        try {
+            mediaRecorder?.release()
+        } catch (e: Exception) {}
     }
 }

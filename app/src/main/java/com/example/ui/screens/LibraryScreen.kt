@@ -530,7 +530,7 @@ fun LibraryScreen(
                 Button(
                     onClick = {
                         if (folderNameInput.isNotBlank()) {
-                            viewModel.setSelectedCategory(folderNameInput.trim())
+                            viewModel.createCategory(folderNameInput)
                             showCreateFolderDialog = false
                             folderNameInput = ""
                         }
@@ -638,7 +638,9 @@ fun LibraryScreen(
                 Button(
                     onClick = {
                         val targetCategory = if (customCategoryInput.isNotBlank()) {
-                            customCategoryInput.trim()
+                            val newCat = customCategoryInput.trim()
+                            viewModel.createCategory(newCat) // Save it persistently
+                            newCat
                         } else if (selectedCategoryToMove.isNotBlank()) {
                             selectedCategoryToMove
                         } else {

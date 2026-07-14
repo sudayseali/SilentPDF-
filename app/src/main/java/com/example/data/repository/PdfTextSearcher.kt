@@ -22,6 +22,18 @@ class PdfTextSearcher(private val context: Context) {
     /**
      * Search for a query term inside a PDF and return page-matched snippets.
      */
+    suspend fun getPagesText(uri: android.net.Uri): List<String> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                val bytes = inputStream.readBytes()
+                return@withContext extractTextByPage(bytes)
+            }
+        } catch (e: Exception) {
+            Log.e("PdfTextSearcher", "Error extracting text pages", e)
+        }
+        return@withContext emptyList()
+    }
+
     suspend fun search(uri: Uri, query: String): List<SearchResult> = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         val results = mutableListOf<SearchResult>()
         if (query.isBlank()) return@withContext results
@@ -47,6 +59,26 @@ class PdfTextSearcher(private val context: Context) {
             Log.e("PdfTextSearcher", "Error searching PDF text", e)
         }
         return@withContext results
+    }
+
+    /**
+     * Search already-cached page texts instantaneously in-memory.
+     */
+    fun searchCached(pagesText: List<String>, query: String): List<SearchResult> {
+        val results = mutableListOf<SearchResult>()
+        if (query.isBlank()) return results
+        pagesText.forEachIndexed { index, text ->
+            if (text.contains(query, ignoreCase = true)) {
+                val occurrences = countOccurrences(text, query)
+                val snippet = createSnippet(text, query)
+                results.add(SearchResult(
+                    pageNumber = index,
+                    snippet = snippet,
+                    occurrencesCount = occurrences
+                ))
+            }
+        }
+        return results
     }
 
     /**

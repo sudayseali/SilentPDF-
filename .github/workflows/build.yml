@@ -3,11 +3,11 @@ name: Android Build
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
-  build-debug:
-    name: SilentPDF (Ready to Install)
+  build:
+    name: Build APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -23,52 +23,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: SilentPDF
+      - name: Generate Debug Keystore
+        run: |
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+
+      - name: Build APK
         run: ./gradlew assembleDebug
 
-      - name: SilentPDF
-        run: mv app/build/outputs/apk/debug/SilentPDF.apk SilentPDF.apk
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: SilentPDf
-          path: SilentPDF.apk
-
-  build-release:
-    name: Build & Sign Release APK
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: gradle
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
-
-      - name: Sign Release APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-          alias: ${{ secrets.ALIAS }}
-          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-
       - name: Rename APK
-        run: mv ${{steps.sign_app.outputs.signedReleaseFile}} SilentPDF.apk
+        run: mv app/build/outputs/apk/debug/app-debug.apk SilentPDF.apk
 
-      - name: Upload Signed Release APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SilentPDF

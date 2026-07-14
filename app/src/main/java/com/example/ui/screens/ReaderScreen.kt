@@ -29,6 +29,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
+import androidx.compose.animation.core.*
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -147,6 +151,7 @@ fun ReaderScreen(
     var selectedColor by remember { mutableStateOf(Color(0xFFF44336)) } // Default Red
     var strokeWidth by remember { mutableStateOf(8f) }
     var isEraserMode by remember { mutableStateOf(false) }
+    var isHighlighterMode by remember { mutableStateOf(false) }
 
     val drawingColors = listOf(
         Color(0xFFF44336), // Red
@@ -172,6 +177,20 @@ fun ReaderScreen(
     var isFullScreen by remember { mutableStateOf(false) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
+    var showVoiceRecorderDialog by remember { mutableStateOf(false) }
+
+    val isRecording by viewModel.isRecording.collectAsState()
+    val recordingSeconds by viewModel.recordingSeconds.collectAsState()
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            viewModel.startVoiceRecording(context)
+        } else {
+            android.widget.Toast.makeText(context, "Fadlan oggolow fasaxa Microphone-ka si aad cod u duubto.", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Active Drawer Tab: 0 = Outline, 1 = Bookmarks, 2 = Search
     var selectedDrawerTab by remember { mutableStateOf(0) }
@@ -762,6 +781,14 @@ fun ReaderScreen(
                                                 showMoreMenu = false
                                             }
                                         )
+                                        DropdownMenuItem(
+                                            text = { Text("Duub Cod (Voice Note)") },
+                                            leadingIcon = { Icon(Icons.Default.Mic, null) },
+                                            onClick = {
+                                                showVoiceRecorderDialog = true
+                                                showMoreMenu = false
+                                            }
+                                        )
                                     }
                                 }
                             }
@@ -799,20 +826,33 @@ fun ReaderScreen(
                                         ) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 IconButton(
-                                                    onClick = { isEraserMode = false },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = false },
                                                     modifier = Modifier.background(
-                                                        color = if (!isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        color = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
                                                     )
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Brush,
                                                         contentDescription = "Qalin",
-                                                        tint = if (!isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                        tint = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { isEraserMode = true },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = true },
+                                                    modifier = Modifier.background(
+                                                        color = if (!isEraserMode && isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.BorderColor,
+                                                        contentDescription = "Highlight",
+                                                        tint = if (!isEraserMode && isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                IconButton(
+                                                    onClick = { isEraserMode = true; isHighlighterMode = false },
                                                     modifier = Modifier.background(
                                                         color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
@@ -998,7 +1038,8 @@ fun ReaderScreen(
                             }
                         }
                     }
-                }
+                },
+
             ) { paddingValues ->
                 Box(
                     modifier = Modifier
@@ -1055,8 +1096,8 @@ fun ReaderScreen(
                                                 val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
                                                 currentStroke = DrawingStroke(
                                                     points = listOf(Offset(unscaledX, unscaledY)),
-                                                    color = selectedColor,
-                                                    width = strokeWidth / scale,
+                                                    color = if (isHighlighterMode) selectedColor.copy(alpha = 0.4f) else selectedColor,
+                                                    width = (if (isHighlighterMode) strokeWidth * 3f else strokeWidth) / scale,
                                                     isEraser = isEraserMode
                                                 )
                                             },
@@ -1157,49 +1198,94 @@ fun ReaderScreen(
                         // If current page has a note, show a beautiful badge overlay
                         val currentPageNote = currentNotes.find { it.pageNumber == currentPage }
                         if (currentPageNote != null) {
+                            val audioPath = if (currentPageNote.noteText.startsWith("[audio:")) {
+                                currentPageNote.noteText.substringAfter("[audio:").substringBefore("]")
+                            } else null
+                            val cleanText = if (currentPageNote.noteText.startsWith("[audio:")) {
+                                currentPageNote.noteText.substringAfter("]").trim()
+                            } else currentPageNote.noteText
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(16.dp),
                                 contentAlignment = Alignment.TopEnd
                             ) {
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
-                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                                    modifier = Modifier
-                                        .widthIn(max = 240.dp)
-                                        .clickable {
-                                            noteInputText = currentPageNote.noteText
-                                            showNoteDialog = true
-                                        }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                if (audioPath != null) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
+                                        ),
+                                        shape = RoundedCornerShape(16.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                        modifier = Modifier.widthIn(max = 280.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Description,
-                                            contentDescription = "Note",
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = "Qoraal Bogga",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.primary
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            VoiceNotePlayer(
+                                                filePath = audioPath,
+                                                onDelete = {
+                                                    if (cleanText.isNotEmpty()) {
+                                                        viewModel.addOrUpdateNote(currentPage, cleanText)
+                                                    } else {
+                                                        viewModel.removeNote(currentPageNote.id)
+                                                    }
+                                                }
                                             )
-                                            Text(
-                                                text = currentPageNote.noteText,
-                                                fontSize = 12.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
+                                            if (cleanText.isNotEmpty()) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = cleanText,
+                                                    fontSize = 11.sp,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    modifier = Modifier.padding(horizontal = 8.dp).clickable {
+                                                        noteInputText = cleanText
+                                                        showNoteDialog = true
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else if (cleanText.isNotEmpty()) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        ),
+                                        shape = RoundedCornerShape(12.dp),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                                        modifier = Modifier
+                                            .widthIn(max = 240.dp)
+                                            .clickable {
+                                                noteInputText = cleanText
+                                                showNoteDialog = true
+                                            }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Description,
+                                                contentDescription = "Note",
+                                                modifier = Modifier.size(18.dp)
                                             )
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = "Qoraal Bogga",
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                                Text(
+                                                    text = cleanText,
+                                                    fontSize = 12.sp,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1239,10 +1325,19 @@ fun ReaderScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val existing = currentNotes.find { it.pageNumber == currentPage }
+                        val audioPrefix = if (existing != null && existing.noteText.startsWith("[audio:")) {
+                            "[audio:" + existing.noteText.substringAfter("[audio:").substringBefore("]") + "] "
+                        } else ""
+
                         if (noteInputText.isNotBlank()) {
-                            viewModel.addOrUpdateNote(currentPage, noteInputText)
+                            viewModel.addOrUpdateNote(currentPage, audioPrefix + noteInputText.trim())
                         } else {
-                            viewModel.removeNoteForPage(currentPage)
+                            if (audioPrefix.isNotEmpty()) {
+                                viewModel.addOrUpdateNote(currentPage, audioPrefix.trim())
+                            } else {
+                                viewModel.removeNoteForPage(currentPage)
+                            }
                         }
                         showNoteDialog = false
                     },
@@ -1273,4 +1368,294 @@ fun ReaderScreen(
             shape = RoundedCornerShape(24.dp)
         )
     }
+
+    if (showVoiceRecorderDialog) {
+        val currentPageNote = currentNotes.find { it.pageNumber == currentPage }
+        val audioPath = if (currentPageNote != null && currentPageNote.noteText.startsWith("[audio:")) {
+            currentPageNote.noteText.substringAfter("[audio:").substringBefore("]")
+        } else null
+
+        AlertDialog(
+            onDismissRequest = { 
+                if (isRecording) {
+                    viewModel.stopVoiceRecording()
+                }
+                showVoiceRecorderDialog = false 
+            },
+            title = {
+                Text(
+                    text = "Duubista Codka - Bogga ${currentPage + 1}",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (isRecording) {
+                        val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+                        val scaleAnim by infiniteTransition.animateFloat(
+                            initialValue = 1f,
+                            targetValue = 1.3f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(1000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Reverse
+                            ),
+                            label = "pulse_scale"
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .size(80.dp)
+                                .graphicsLayer {
+                                    scaleX = scaleAnim
+                                    scaleY = scaleAnim
+                                }
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.15f), shape = CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .background(MaterialTheme.colorScheme.error, shape = CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Mic, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                            }
+                        }
+
+                        val minutes = recordingSeconds / 60
+                        val seconds = recordingSeconds % 60
+                        Text(
+                            text = String.format("%02d:%02d", minutes, seconds),
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+
+                        Text(
+                            text = "Codkaaga ayaa hadda la duubayaa...",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Button(
+                            onClick = { viewModel.stopVoiceRecording() },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Stop, contentDescription = "Jooji", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Dhegeyso & Keydi")
+                        }
+                    } else {
+                        if (audioPath != null) {
+                            Text(
+                                text = "Boggan wuxuu horey u leeyahay cod duuban:",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.align(Alignment.Start)
+                            )
+                            
+                            VoiceNotePlayer(
+                                filePath = audioPath,
+                                onDelete = {
+                                    if (currentPageNote != null) {
+                                        val cleanText = currentPageNote.noteText.substringAfter("]").trim()
+                                        if (cleanText.isNotEmpty()) {
+                                            viewModel.addOrUpdateNote(currentPage, cleanText)
+                                        } else {
+                                            viewModel.removeNote(currentPageNote.id)
+                                        }
+                                    }
+                                }
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f), modifier = Modifier.padding(vertical = 4.dp))
+                            
+                            Text(
+                                text = "Ma rabtaa inaad dib u duubto codka?",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), shape = CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Mic,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                            }
+
+                            Text(
+                                text = "Riix badhanka hoose si aad u bilowdo duubista codka.",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                val permission = android.Manifest.permission.RECORD_AUDIO
+                                val isGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+                                    context,
+                                    permission
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                
+                                if (isGranted) {
+                                    viewModel.startVoiceRecording(context)
+                                } else {
+                                    micPermissionLauncher.launch(permission)
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (audioPath != null) "Duub Cod Cusub" else "Bilow Duubista")
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        if (isRecording) {
+                            viewModel.stopVoiceRecording()
+                        }
+                        showVoiceRecorderDialog = false 
+                    }
+                ) {
+                    Text("Xidh")
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
+    }
+
+
 }
+
+
+@Composable
+fun VoiceNotePlayer(filePath: String, onDelete: () -> Unit) {
+    val context = LocalContext.current
+    var isPlaying by remember { mutableStateOf(false) }
+    var position by remember { mutableStateOf(0f) }
+    var duration by remember { mutableStateOf(1f) } // prevent division by zero
+    var mediaPlayer by remember { mutableStateOf<android.media.MediaPlayer?>(null) }
+
+    DisposableEffect(filePath) {
+        onDispose {
+            mediaPlayer?.release()
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) {
+            while (isPlaying && mediaPlayer?.isPlaying == true) {
+                position = mediaPlayer?.currentPosition?.toFloat() ?: 0f
+                kotlinx.coroutines.delay(200)
+            }
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = {
+                if (isPlaying) {
+                    mediaPlayer?.pause()
+                    isPlaying = false
+                } else {
+                    try {
+                        if (mediaPlayer == null) {
+                            mediaPlayer = android.media.MediaPlayer().apply {
+                                setDataSource(filePath)
+                                prepare()
+                                setOnCompletionListener {
+                                    isPlaying = false
+                                    position = 0f
+                                }
+                            }
+                        }
+                        mediaPlayer?.start()
+                        duration = mediaPlayer?.duration?.toFloat() ?: 1f
+                        isPlaying = true
+                    } catch (e: Exception) {
+                        android.util.Log.e("VoiceNotePlayer", "Playback failed", e)
+                    }
+                }
+            }) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = "Garaac / Hakaji",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Codka Bogga", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Slider(
+                    value = position,
+                    onValueChange = {
+                        mediaPlayer?.seekTo(it.toInt())
+                        position = it
+                    },
+                    valueRange = 0f..duration,
+                    modifier = Modifier.height(24.dp)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    val currentMin = (position / 1000).toInt() / 60
+                    val currentSec = (position / 1000).toInt() % 60
+                    val totalMin = (duration / 1000).toInt() / 60
+                    val totalSec = (duration / 1000).toInt() % 60
+                    Text(
+                        text = String.format("%02d:%02d", currentMin, currentSec),
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = String.format("%02d:%02d", totalMin, totalSec),
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            IconButton(onClick = {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null
+                isPlaying = false
+                onDelete()
+            }) {
+                Icon(Icons.Default.Delete, contentDescription = "Tirtir", tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
