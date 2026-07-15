@@ -804,12 +804,34 @@ fun LibraryScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(paddingValues),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF08090E))) {
+            // Premium subtle glowing background orbs
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF2F80ED).copy(alpha = 0.2f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.1f),
+                        radius = size.width * 0.8f
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.1f),
+                    radius = size.width * 0.8f
+                )
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF9C27B0).copy(alpha = 0.1f), Color.Transparent),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.6f),
+                        radius = size.width * 0.7f
+                    ),
+                    center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.6f),
+                    radius = size.width * 0.7f
+                )
+            }
+            LazyColumn(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
             // 1. Premium Top Bar Branded
             item {
                 Row(
@@ -1204,6 +1226,7 @@ fun LibraryScreen(
                 }
             }
         }
+        } // Close the Box wrapping LazyColumn
     }
 
     // Settings Modal Bottom Sheet

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -697,102 +698,161 @@ fun ReaderScreen(
                         enter = slideInVertically(initialOffsetY = { -it }),
                         exit = slideOutVertically(targetOffsetY = { -it })
                     ) {
-                        TopAppBar(
-                            title = {
-                                Text(
-                                    text = currentPdf?.fileName ?: "Silent PDF",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
+                        // Premium Floating Top Bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF08090E).copy(alpha = 0.95f),
+                                            Color(0xFF08090E).copy(alpha = 0.8f),
+                                            Color.Transparent
+                                        )
+                                    )
                                 )
-                            },
-                            navigationIcon = {
-                                IconButton(onClick = onNavigateBack) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel")
-                                }
-                            },
-                            actions = {
-                                // Search Icon - triggers drawer text search directly
-                                IconButton(onClick = {
-                                    selectedDrawerTab = 2 // Switch directly to search tab
-                                    coroutineScope.launch { drawerState.open() }
-                                }) {
-                                    Icon(Icons.Default.Search, contentDescription = "Search text", tint = MaterialTheme.colorScheme.primary)
-                                }
-                                
-                                IconButton(onClick = { isDrawingMode = !isDrawingMode }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = "Draw / Write",
-                                        tint = if (isDrawingMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(onClick = { viewModel.toggleTrueDarkMode() }) {
-                                    Icon(Icons.Outlined.Contrast, contentDescription = "Black / White")
-                                }
-                                val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
-                                IconButton(onClick = { viewModel.toggleBookmarkCurrentPage() }) {
-                                    Icon(
-                                        imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                        contentDescription = "Bookmark",
-                                        tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                IconButton(onClick = { coroutineScope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Outlined.FormatListNumbered, contentDescription = "TOC")
-                                }
-                                Box {
-                                    IconButton(onClick = { showMoreMenu = true }) {
-                                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                                .padding(top = 40.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xFF111422).copy(alpha = 0.85f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    IconButton(
+                                        onClick = onNavigateBack,
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF1E263D).copy(alpha = 0.5f))
+                                    ) {
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel", tint = Color.White)
                                     }
-                                    DropdownMenu(expanded = showMoreMenu, onDismissRequest = { showMoreMenu = false }) {
-                                         DropdownMenuItem(
-                                             text = { Text("Add/Edit Note") },
-                                             leadingIcon = { Icon(Icons.Default.Edit, null) },
-                                             onClick = {
-                                                 val existing = currentNotes.find { it.pageNumber == currentPage }
-                                                 noteInputText = existing?.noteText ?: ""
-                                                 showNoteDialog = true
-                                                 showMoreMenu = false
-                                             }
-                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Fullscreen") },
-                                            leadingIcon = { Icon(Icons.Default.Fullscreen, null) },
-                                            onClick = {
-                                                isFullScreen = true
-                                                showMoreMenu = false
-                                            }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = currentPdf?.fileName ?: "Silent PDF",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        color = Color.White,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            selectedDrawerTab = 2 // Switch directly to search tab
+                                            coroutineScope.launch { drawerState.open() }
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.Search, contentDescription = "Search text", tint = Color(0xFF2F80ED), modifier = Modifier.size(20.dp))
+                                    }
+                                    
+                                    IconButton(
+                                        onClick = { isDrawingMode = !isDrawingMode },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Draw / Write",
+                                            tint = if (isDrawingMode) Color(0xFF2F80ED) else Color(0xFF94A3B8),
+                                            modifier = Modifier.size(20.dp)
                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Print") },
-                                            leadingIcon = { Icon(Icons.Default.Print, null) },
-                                            onClick = {
-                                                currentPdf?.let { printPdf(context, it) }
-                                                showMoreMenu = false
-                                            }
+                                    }
+                                    IconButton(
+                                        onClick = { viewModel.toggleTrueDarkMode() },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                    }
+                                    val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
+                                    IconButton(
+                                        onClick = { viewModel.toggleBookmarkCurrentPage() },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                            contentDescription = "Bookmark",
+                                            tint = if (isBookmarked) Color(0xFFFF9500) else Color(0xFF94A3B8),
+                                            modifier = Modifier.size(20.dp)
                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Details") },
-                                            leadingIcon = { Icon(Icons.Default.Info, null) },
-                                            onClick = {
-                                                showInfoDialog = true
-                                                showMoreMenu = false
-                                            }
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Voice Note") },
-                                            leadingIcon = { Icon(Icons.Default.Mic, null) },
-                                            onClick = {
-                                                showVoiceRecorderDialog = true
-                                                showMoreMenu = false
-                                            }
-                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { coroutineScope.launch { drawerState.open() } },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.FormatListNumbered, contentDescription = "TOC", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                    }
+                                    Box {
+                                        IconButton(
+                                            onClick = { showMoreMenu = true },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                        }
+                                        DropdownMenu(
+                                            expanded = showMoreMenu, 
+                                            onDismissRequest = { showMoreMenu = false },
+                                            modifier = Modifier.background(Color(0xFF191D31))
+                                        ) {
+                                             DropdownMenuItem(
+                                                 text = { Text("Add/Edit Note", color = Color(0xFFF1F5F9)) },
+                                                 leadingIcon = { Icon(Icons.Default.Edit, null, tint = Color(0xFF2F80ED)) },
+                                                 onClick = {
+                                                     val existing = currentNotes.find { it.pageNumber == currentPage }
+                                                     noteInputText = existing?.noteText ?: ""
+                                                     showNoteDialog = true
+                                                     showMoreMenu = false
+                                                 }
+                                             )
+                                            DropdownMenuItem(
+                                                text = { Text("Fullscreen", color = Color(0xFFF1F5F9)) },
+                                                leadingIcon = { Icon(Icons.Default.Fullscreen, null, tint = Color(0xFFF1F5F9)) },
+                                                onClick = {
+                                                    isFullScreen = true
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Print", color = Color(0xFFF1F5F9)) },
+                                                leadingIcon = { Icon(Icons.Default.Print, null, tint = Color(0xFFF1F5F9)) },
+                                                onClick = {
+                                                    currentPdf?.let { printPdf(context, it) }
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Details", color = Color(0xFFF1F5F9)) },
+                                                leadingIcon = { Icon(Icons.Default.Info, null, tint = Color(0xFFF1F5F9)) },
+                                                onClick = {
+                                                    showInfoDialog = true
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Voice Note", color = Color(0xFFF1F5F9)) },
+                                                leadingIcon = { Icon(Icons.Default.Mic, null, tint = Color(0xFF2F80ED)) },
+                                                onClick = {
+                                                    showVoiceRecorderDialog = true
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        )
+                        }
                     }
                 },
                 bottomBar = {
@@ -801,14 +861,28 @@ fun ReaderScreen(
                         enter = slideInVertically(initialOffsetY = { it }),
                         exit = slideOutVertically(targetOffsetY = { it })
                     ) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 6.dp,
-                            modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+                        // Premium Floating Bottom Bar
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color(0xFF08090E).copy(alpha = 0.8f),
+                                            Color(0xFF08090E).copy(alpha = 0.95f)
+                                        )
+                                    )
+                                )
+                                .padding(bottom = 32.dp, top = 16.dp, start = 16.dp, end = 16.dp)
+                                .windowInsetsPadding(WindowInsets.navigationBars)
                         ) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(Color(0xFF111422).copy(alpha = 0.85f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
