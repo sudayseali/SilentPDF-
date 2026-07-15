@@ -70,6 +70,9 @@ dependencies {
     // Not in catalog, but okay
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     
+    // Coil
+    implementation(libs.coil.compose)
+    
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

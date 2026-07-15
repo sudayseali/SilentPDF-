@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import com.example.data.db.PdfEntity
 import com.example.ui.viewmodel.SilentPdfViewModel
 
@@ -79,7 +81,8 @@ fun BookCover(
     title: String,
     modifier: Modifier = Modifier,
     isFavorite: Boolean = false,
-    progress: Float = 0.0f
+    progress: Float = 0.0f,
+    uriString: String? = null
 ) {
     val titleHash = title.hashCode()
     val gradientColors = remember(titleHash) {
@@ -94,33 +97,63 @@ fun BookCover(
         colorsList[kotlin.math.abs(titleHash) % colorsList.size]
     }
 
+    val context = LocalContext.current
+    var thumbnailFile by remember(uriString) { mutableStateOf<java.io.File?>(null) }
+    
+    LaunchedEffect(uriString) {
+        if (uriString != null) {
+            thumbnailFile = com.example.util.PdfThumbnailHelper.getThumbnail(context, uriString)
+        }
+    }
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(Brush.verticalGradient(gradientColors))
             .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
     ) {
-        // Decorative Abstract Lines inside cover
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            drawCircle(
-                color = Color.White.copy(alpha = 0.02f),
-                radius = w * 0.55f,
-                center = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.2f)
+        if (thumbnailFile != null) {
+            AsyncImage(
+                model = thumbnailFile,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
-            drawLine(
-                color = Color.White.copy(alpha = 0.02f),
-                start = androidx.compose.ui.geometry.Offset(0f, h * 0.72f),
-                end = androidx.compose.ui.geometry.Offset(w, h * 0.35f),
-                strokeWidth = 2f
+            // Overlay gradient to make text visible if thumbnail is too bright
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)),
+                            startY = 0f,
+                            endY = Float.POSITIVE_INFINITY
+                        )
+                    )
             )
-            drawLine(
-                color = Color.White.copy(alpha = 0.02f),
-                start = androidx.compose.ui.geometry.Offset(0f, h * 0.77f),
-                end = androidx.compose.ui.geometry.Offset(w, h * 0.40f),
-                strokeWidth = 2f
-            )
+        } else {
+            // Decorative Abstract Lines inside cover
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.02f),
+                    radius = w * 0.55f,
+                    center = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.2f)
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.02f),
+                    start = androidx.compose.ui.geometry.Offset(0f, h * 0.72f),
+                    end = androidx.compose.ui.geometry.Offset(w, h * 0.35f),
+                    strokeWidth = 2f
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.02f),
+                    start = androidx.compose.ui.geometry.Offset(0f, h * 0.77f),
+                    end = androidx.compose.ui.geometry.Offset(w, h * 0.40f),
+                    strokeWidth = 2f
+                )
+            }
         }
 
         // Left 3D Book Spine shadow overlay
@@ -170,31 +203,33 @@ fun BookCover(
             )
         }
 
-        // Elegant Book Typography (Centered)
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.Center)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = Icons.Filled.MenuBook,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.15f),
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = title.removeSuffix(".pdf").take(30),
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                textAlign = TextAlign.Center,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
+        if (thumbnailFile == null) {
+            // Elegant Book Typography (Centered)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MenuBook,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = title.removeSuffix(".pdf").take(30),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         // Mini Reading status pill at bottom
@@ -312,6 +347,7 @@ fun ContinueReadingCard(
                 title = pdf.fileName,
                 isFavorite = pdf.isFavorite,
                 progress = progress,
+                uriString = pdf.uriString,
                 modifier = Modifier
                     .size(56.dp, 78.dp)
             )
@@ -481,6 +517,7 @@ fun GridPdfCard(
                     title = pdf.fileName,
                     isFavorite = pdf.isFavorite,
                     progress = progress,
+                    uriString = pdf.uriString,
                     modifier = Modifier.fillMaxSize()
                 )
 
