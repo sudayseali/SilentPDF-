@@ -97,46 +97,53 @@ class PdfRenderEngine(private val context: Context) {
 
         try {
             val page = renderer.openPage(pageIndex)
-            val originalWidth = page.width
-            val originalHeight = page.height
+            try {
+                val originalWidth = page.width
+                val originalHeight = page.height
 
-            // Scale factor to downscale large high-dpi page bitmaps for mobile widths
-            val scale = if (targetWidth > 0) {
-                targetWidth.toFloat() / originalWidth.toFloat()
-            } else {
-                1.0f
-            }
-
-            // Cap maximum width of rendered pages to prevent massive native memory allocations
-            val finalScale = if (originalWidth * scale > 1800f) {
-                1800f / originalWidth.toFloat()
-            } else {
-                scale
-            }
-
-            val renderWidth = (originalWidth * finalScale).toInt().coerceAtLeast(100)
-            val renderHeight = (originalHeight * finalScale).toInt().coerceAtLeast(100)
-
-            val bitmap = try {
-                Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888).apply {
-                    eraseColor(android.graphics.Color.WHITE)
+                // Scale factor to downscale large high-dpi page bitmaps for mobile widths
+                val scale = if (targetWidth > 0) {
+                    targetWidth.toFloat() / originalWidth.toFloat()
+                } else {
+                    1.0f
                 }
-            } catch (e: OutOfMemoryError) {
-                Log.e("PdfRenderEngine", "OOM when creating bitmap for page $pageIndex", e)
-                System.gc() // Hint GC
-                // Fallback to smaller bitmap to save memory
-                val smallerWidth = (renderWidth / 2).coerceAtLeast(100)
-                val smallerHeight = (renderHeight / 2).coerceAtLeast(100)
-                Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888).apply {
-                    eraseColor(android.graphics.Color.WHITE)
+
+                // Cap maximum width of rendered pages to prevent massive native memory allocations
+                val finalScale = if (originalWidth * scale > 1800f) {
+                    1800f / originalWidth.toFloat()
+                } else {
+                    scale
+                }
+
+                val renderWidth = (originalWidth * finalScale).toInt().coerceAtLeast(100)
+                val renderHeight = (originalHeight * finalScale).toInt().coerceAtLeast(100)
+
+                val bitmap = try {
+                    Bitmap.createBitmap(renderWidth, renderHeight, Bitmap.Config.ARGB_8888).apply {
+                        eraseColor(android.graphics.Color.WHITE)
+                    }
+                } catch (e: OutOfMemoryError) {
+                    Log.e("PdfRenderEngine", "OOM when creating bitmap for page $pageIndex", e)
+                    System.gc() // Hint GC
+                    // Fallback to smaller bitmap to save memory
+                    val smallerWidth = (renderWidth / 2).coerceAtLeast(100)
+                    val smallerHeight = (renderHeight / 2).coerceAtLeast(100)
+                    Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888).apply {
+                        eraseColor(android.graphics.Color.WHITE)
+                    }
+                }
+
+                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+                bitmapCache.put(pageIndex, bitmap)
+                return@withContext bitmap
+            } finally {
+                try {
+                    page.close()
+                } catch (e: Exception) {
+                    Log.e("PdfRenderEngine", "Error closing page $pageIndex", e)
                 }
             }
-
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-            page.close()
-
-            bitmapCache.put(pageIndex, bitmap)
-            return@withContext bitmap
         } catch (e: OutOfMemoryError) {
             Log.e("PdfRenderEngine", "OOM during renderPage $pageIndex", e)
             return@withContext null
@@ -147,6 +154,17 @@ class PdfRenderEngine(private val context: Context) {
     }
 
     fun closeDocument() {
+        // Explicitly recycle cached bitmaps to release large native memory blocks immediately
+        try {
+            val snapshot = bitmapCache.snapshot()
+            for (bitmap in snapshot.values) {
+                if (bitmap != null && !bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("PdfRenderEngine", "Error recycling cached bitmaps", e)
+        }
         bitmapCache.evictAll()
 
         try {

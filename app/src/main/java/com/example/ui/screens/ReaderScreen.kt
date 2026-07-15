@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.animation.core.*
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -119,6 +120,15 @@ fun ReaderScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+
+    val handleExit = {
+        viewModel.closePdf()
+        onNavigateBack()
+    }
+
+    BackHandler {
+        handleExit()
+    }
 
     val currentPdf by viewModel.currentPdf.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
@@ -237,7 +247,7 @@ fun ReaderScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Start
                 ) {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = handleExit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel")
                     }
                 }
@@ -735,7 +745,7 @@ fun ReaderScreen(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     IconButton(
-                                        onClick = onNavigateBack,
+                                        onClick = handleExit,
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)

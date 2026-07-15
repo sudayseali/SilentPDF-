@@ -479,9 +479,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun closePdf() {
+        _currentPageBitmap.value = null
         renderEngine.closeDocument()
         _currentPdf.value = null
-        _currentPageBitmap.value = null
         _pageCount.value = 0
         _currentPage.value = 0
         _isPasswordProtected.value = false

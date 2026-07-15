@@ -26,39 +26,59 @@ object PdfThumbnailHelper {
             }
             
             val uri = Uri.parse(uriString)
-            val pfd: ParcelFileDescriptor? = context.contentResolver.openFileDescriptor(uri, "r")
-            
-            if (pfd != null) {
-                val pdfRenderer = PdfRenderer(pfd)
-                if (pdfRenderer.pageCount > 0) {
-                    val page = pdfRenderer.openPage(0)
-                    
-                    // Render to a reasonably sized bitmap for thumbnail
-                    val width = 400
-                    val height = (width.toFloat() / page.width * page.height).toInt()
-                    
-                    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    
-                    // White background
-                    val canvas = android.graphics.Canvas(bitmap)
-                    canvas.drawColor(Color.WHITE)
-                    
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    page.close()
-                    
-                    val out = FileOutputStream(thumbnailFile)
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                    out.flush()
-                    out.close()
-                    bitmap.recycle()
-                    
-                    pdfRenderer.close()
-                    pfd.close()
-                    
-                    return@withContext thumbnailFile
+            var pfd: ParcelFileDescriptor? = null
+            var pdfRenderer: PdfRenderer? = null
+            try {
+                pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                if (pfd != null) {
+                    pdfRenderer = PdfRenderer(pfd)
+                    if (pdfRenderer.pageCount > 0) {
+                        var page: PdfRenderer.Page? = null
+                        try {
+                            page = pdfRenderer.openPage(0)
+                            
+                            // Render to a reasonably sized bitmap for thumbnail
+                            val width = 400
+                            val height = (width.toFloat() / page.width * page.height).toInt().coerceAtLeast(1)
+                            
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                // White background
+                                val canvas = android.graphics.Canvas(bitmap)
+                                canvas.drawColor(Color.WHITE)
+                                
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                
+                                FileOutputStream(thumbnailFile).use { out ->
+                                    bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                                    out.flush()
+                                }
+                                return@withContext thumbnailFile
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        } finally {
+                            try {
+                                page?.close()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
                 }
-                pdfRenderer.close()
-                pfd.close()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                try {
+                    pdfRenderer?.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                try {
+                    pfd?.close()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
