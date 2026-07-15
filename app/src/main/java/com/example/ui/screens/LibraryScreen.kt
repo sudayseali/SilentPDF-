@@ -951,44 +951,98 @@ fun LibraryScreen(
             // 3. Quick Actions Rows / Stats Cards
             if (searchQuery.isEmpty() && selectedCategory == null) {
                 item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        QuickActionCard(
-                            icon = Icons.Filled.Description,
-                            title = "All Files",
-                            count = pdfsList.size.toString(),
-                            isSelected = selectedTab == 0,
-                            onClick = { viewModel.setSelectedTab(0) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickActionCard(
-                            icon = Icons.Outlined.Schedule,
-                            title = "Recent",
-                            count = recentPdfs.size.toString(),
-                            isSelected = selectedTab == 1,
-                            onClick = { viewModel.setSelectedTab(1) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickActionCard(
-                            icon = Icons.Outlined.StarBorder,
-                            title = "Favorites",
-                            count = pdfsList.count { it.isFavorite }.toString(),
-                            isSelected = selectedTab == 2,
-                            onClick = { viewModel.setSelectedTab(2) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        QuickActionCard(
-                            icon = Icons.Filled.Folder,
-                            title = "Folders",
-                            count = allCategories.size.toString(),
-                            isSelected = false,
-                            onClick = { /* Scroll down / focus folders */ },
-                            modifier = Modifier.weight(1f)
-                        )
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val screenWidth = configuration.screenWidthDp
+                    if (screenWidth < 480) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                QuickActionCard(
+                                    icon = Icons.Filled.Description,
+                                    title = "All Files",
+                                    count = pdfsList.size.toString(),
+                                    isSelected = selectedTab == 0,
+                                    onClick = { viewModel.setSelectedTab(0) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                QuickActionCard(
+                                    icon = Icons.Outlined.Schedule,
+                                    title = "Recent",
+                                    count = recentPdfs.size.toString(),
+                                    isSelected = selectedTab == 1,
+                                    onClick = { viewModel.setSelectedTab(1) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                QuickActionCard(
+                                    icon = Icons.Outlined.StarBorder,
+                                    title = "Favorites",
+                                    count = pdfsList.count { it.isFavorite }.toString(),
+                                    isSelected = selectedTab == 2,
+                                    onClick = { viewModel.setSelectedTab(2) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                QuickActionCard(
+                                    icon = Icons.Filled.Folder,
+                                    title = "Folders",
+                                    count = allCategories.size.toString(),
+                                    isSelected = false,
+                                    onClick = { /* Scroll down / focus folders */ },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            QuickActionCard(
+                                icon = Icons.Filled.Description,
+                                title = "All Files",
+                                count = pdfsList.size.toString(),
+                                isSelected = selectedTab == 0,
+                                onClick = { viewModel.setSelectedTab(0) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            QuickActionCard(
+                                icon = Icons.Outlined.Schedule,
+                                title = "Recent",
+                                count = recentPdfs.size.toString(),
+                                isSelected = selectedTab == 1,
+                                onClick = { viewModel.setSelectedTab(1) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            QuickActionCard(
+                                icon = Icons.Outlined.StarBorder,
+                                title = "Favorites",
+                                count = pdfsList.count { it.isFavorite }.toString(),
+                                isSelected = selectedTab == 2,
+                                onClick = { viewModel.setSelectedTab(2) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            QuickActionCard(
+                                icon = Icons.Filled.Folder,
+                                title = "Folders",
+                                count = allCategories.size.toString(),
+                                isSelected = false,
+                                onClick = { /* Scroll down / focus folders */ },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
             }
@@ -1190,7 +1244,16 @@ fun LibraryScreen(
                         onActionClick = { filePickerLauncher.launch(arrayOf("application/pdf")) }
                     )
                 } else {
-                    val chunkedPdfs = filteredList.chunked(3)
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val screenWidth = configuration.screenWidthDp
+                    val columns = when {
+                        screenWidth >= 1200 -> 6
+                        screenWidth >= 900 -> 5
+                        screenWidth >= 600 -> 4
+                        screenWidth >= 440 -> 3
+                        else -> 2
+                    }
+                    val chunkedPdfs = filteredList.chunked(columns)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -1217,7 +1280,7 @@ fun LibraryScreen(
                                         )
                                     }
                                 }
-                                for (i in rowItems.size until 3) {
+                                for (i in rowItems.size until columns) {
                                     Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
