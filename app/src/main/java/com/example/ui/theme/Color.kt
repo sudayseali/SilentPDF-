@@ -3,6 +3,20 @@ package com.example.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // Light Theme Tones
+val PremiumLightBackground = Color(0xFFF4F6FA)       // Soft, modern off-white background
+val PremiumLightSurface = Color(0xFFFFFFFF)          // Pure white for cards, sheets, and components
+val PremiumLightSurfaceVariant = Color(0xFFEDF2F7)   // Soft secondary background elements
+val PremiumLightPrimary = Color(0xFF2F80ED)          // Premium Electric Blue
+val PremiumLightOnPrimary = Color(0xFFFFFFFF)        // Clean white text on primary actions
+val PremiumLightPrimaryContainer = Color(0xFFEBF4FF) // Light translucent blue background for icons/badges
+val PremiumLightOnPrimaryContainer = Color(0xFF1E3A8A)// Navy text inside light blue containers
+
+val PremiumLightTextPrimary = Color(0xFF0F172A)      // Rich dark slate for high readability
+val PremiumLightTextSecondary = Color(0xFF475569)    // Elegant slate grey for subtitles
+val PremiumLightTextTertiary = Color(0xFF94A3B8)     // Muted grey for hints and tiny details
+val PremiumLightBorder = Color(0xFFE2E8F0)           // Super soft hairline border color
+
+// Light Theme Tones (Legacy Compatibility)
 val SagePrimary = Color(0xFF1E88E5)
 val SageOnPrimary = Color(0xFFFFFFFF)
 val SagePrimaryContainer = Color(0xFFE3F2FD)

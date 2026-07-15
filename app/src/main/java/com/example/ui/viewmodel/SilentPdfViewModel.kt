@@ -51,6 +51,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     val selectedCategory: StateFlow<String?> = _selectedCategory
 
     private val customCategoriesPref = application.getSharedPreferences("app_custom_categories", android.content.Context.MODE_PRIVATE)
+    private val viewSettingsPrefs = application.getSharedPreferences("app_view_settings", android.content.Context.MODE_PRIVATE)
 
     private val _customCategories = MutableStateFlow<Set<String>>(
         customCategoriesPref.getStringSet("categories", emptySet()) ?: emptySet()
@@ -76,13 +77,13 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     // View Settings (True Dark Mode, Grid/List view, Horizontal vs Vertical scrolling)
-    private val _isTrueDarkMode = MutableStateFlow(false)
+    private val _isTrueDarkMode = MutableStateFlow(viewSettingsPrefs.getBoolean("true_dark_mode", false))
     val isTrueDarkMode: StateFlow<Boolean> = _isTrueDarkMode
 
-    private val _isGridView = MutableStateFlow(false)
+    private val _isGridView = MutableStateFlow(viewSettingsPrefs.getBoolean("grid_view", false))
     val isGridView: StateFlow<Boolean> = _isGridView
 
-    private val _isHorizontalScroll = MutableStateFlow(false)
+    private val _isHorizontalScroll = MutableStateFlow(viewSettingsPrefs.getBoolean("horizontal_scroll", false))
     val isHorizontalScroll: StateFlow<Boolean> = _isHorizontalScroll
 
     // State: Password decryption for encrypted PDFs
@@ -391,9 +392,21 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             repository.updateCategory(pdf.uriString, category?.takeIf { it.isNotBlank() })
         }
     }
-    fun toggleTrueDarkMode() { _isTrueDarkMode.value = !_isTrueDarkMode.value }
-    fun toggleGridView() { _isGridView.value = !_isGridView.value }
-    fun toggleHorizontalScroll() { _isHorizontalScroll.value = !_isHorizontalScroll.value }
+    fun toggleTrueDarkMode() {
+        val newValue = !_isTrueDarkMode.value
+        _isTrueDarkMode.value = newValue
+        viewSettingsPrefs.edit().putBoolean("true_dark_mode", newValue).apply()
+    }
+    fun toggleGridView() {
+        val newValue = !_isGridView.value
+        _isGridView.value = newValue
+        viewSettingsPrefs.edit().putBoolean("grid_view", newValue).apply()
+    }
+    fun toggleHorizontalScroll() {
+        val newValue = !_isHorizontalScroll.value
+        _isHorizontalScroll.value = newValue
+        viewSettingsPrefs.edit().putBoolean("horizontal_scroll", newValue).apply()
+    }
 
     fun toggleFavorite(pdf: PdfEntity) {
         viewModelScope.launch {

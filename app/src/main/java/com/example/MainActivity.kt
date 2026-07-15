@@ -26,17 +26,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
-                SilentPdfApp()
+            val viewModel: SilentPdfViewModel = viewModel()
+            val isTrueDarkMode by viewModel.isTrueDarkMode.collectAsState()
+            MyApplicationTheme(darkTheme = isTrueDarkMode) {
+                SilentPdfApp(viewModel = viewModel)
             }
         }
     }
 }
 
 @Composable
-fun SilentPdfApp() {
+fun SilentPdfApp(viewModel: SilentPdfViewModel = viewModel()) {
     val navController = rememberNavController()
-    val viewModel: SilentPdfViewModel = viewModel()
     val isAppLocked by viewModel.isAppLocked.collectAsState()
 
     if (isAppLocked) {

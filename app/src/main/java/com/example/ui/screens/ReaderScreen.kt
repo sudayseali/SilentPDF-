@@ -129,6 +129,13 @@ fun ReaderScreen(
     val bookmarks by viewModel.currentBookmarks.collectAsState()
     val pageDrawings by viewModel.pageDrawings.collectAsState()
 
+    val readerBgColor = if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.background
+    val readerSurfaceColor = if (isTrueDarkMode) Color(0xFF111422) else MaterialTheme.colorScheme.surface
+    val readerBorderColor = if (isTrueDarkMode) Color.White.copy(alpha = 0.08f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+    val readerOnSurfaceColor = if (isTrueDarkMode) Color(0xFFF1F5F9) else MaterialTheme.colorScheme.onSurface
+    val readerOnSurfaceVariantColor = if (isTrueDarkMode) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+    val readerButtonBgColor = if (isTrueDarkMode) Color(0xFF1E263D).copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+
     // Password decrypt flows
     val isPasswordProtected by viewModel.isPasswordProtected.collectAsState()
     val pdfOpeningError by viewModel.pdfOpeningError.collectAsState()
@@ -705,8 +712,8 @@ fun ReaderScreen(
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(
-                                            Color(0xFF08090E).copy(alpha = 0.95f),
-                                            Color(0xFF08090E).copy(alpha = 0.8f),
+                                            readerBgColor.copy(alpha = 0.95f),
+                                            readerBgColor.copy(alpha = 0.8f),
                                             Color.Transparent
                                         )
                                     )
@@ -717,8 +724,8 @@ fun ReaderScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(Color(0xFF111422).copy(alpha = 0.85f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+                                    .background(readerSurfaceColor.copy(alpha = 0.85f))
+                                    .border(1.dp, readerBorderColor, RoundedCornerShape(20.dp))
                                     .padding(horizontal = 8.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
@@ -732,9 +739,9 @@ fun ReaderScreen(
                                         modifier = Modifier
                                             .size(40.dp)
                                             .clip(CircleShape)
-                                            .background(Color(0xFF1E263D).copy(alpha = 0.5f))
+                                            .background(readerButtonBgColor)
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel", tint = Color.White)
+                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Cancel", tint = readerOnSurfaceColor)
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
@@ -743,7 +750,7 @@ fun ReaderScreen(
                                         overflow = TextOverflow.Ellipsis,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 16.sp,
-                                        color = Color.White,
+                                        color = readerOnSurfaceColor,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -766,7 +773,7 @@ fun ReaderScreen(
                                         Icon(
                                             imageVector = Icons.Default.Edit,
                                             contentDescription = "Draw / Write",
-                                            tint = if (isDrawingMode) Color(0xFF2F80ED) else Color(0xFF94A3B8),
+                                            tint = if (isDrawingMode) Color(0xFF2F80ED) else readerOnSurfaceVariantColor,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -774,7 +781,7 @@ fun ReaderScreen(
                                         onClick = { viewModel.toggleTrueDarkMode() },
                                         modifier = Modifier.size(36.dp)
                                     ) {
-                                        Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                     }
                                     val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                     IconButton(
@@ -784,7 +791,7 @@ fun ReaderScreen(
                                         Icon(
                                             imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                                             contentDescription = "Bookmark",
-                                            tint = if (isBookmarked) Color(0xFFFF9500) else Color(0xFF94A3B8),
+                                            tint = if (isBookmarked) Color(0xFFFF9500) else readerOnSurfaceVariantColor,
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -792,22 +799,22 @@ fun ReaderScreen(
                                         onClick = { coroutineScope.launch { drawerState.open() } },
                                         modifier = Modifier.size(36.dp)
                                     ) {
-                                        Icon(Icons.Outlined.FormatListNumbered, contentDescription = "TOC", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Outlined.FormatListNumbered, contentDescription = "TOC", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                     }
                                     Box {
                                         IconButton(
                                             onClick = { showMoreMenu = true },
                                             modifier = Modifier.size(36.dp)
                                         ) {
-                                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+                                            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                         }
                                         DropdownMenu(
                                             expanded = showMoreMenu, 
                                             onDismissRequest = { showMoreMenu = false },
-                                            modifier = Modifier.background(Color(0xFF191D31))
+                                            modifier = Modifier.background(readerSurfaceColor)
                                         ) {
                                              DropdownMenuItem(
-                                                 text = { Text("Add/Edit Note", color = Color(0xFFF1F5F9)) },
+                                                 text = { Text("Add/Edit Note", color = readerOnSurfaceColor) },
                                                  leadingIcon = { Icon(Icons.Default.Edit, null, tint = Color(0xFF2F80ED)) },
                                                  onClick = {
                                                      val existing = currentNotes.find { it.pageNumber == currentPage }
@@ -817,31 +824,31 @@ fun ReaderScreen(
                                                  }
                                              )
                                             DropdownMenuItem(
-                                                text = { Text("Fullscreen", color = Color(0xFFF1F5F9)) },
-                                                leadingIcon = { Icon(Icons.Default.Fullscreen, null, tint = Color(0xFFF1F5F9)) },
+                                                text = { Text("Fullscreen", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.Fullscreen, null, tint = readerOnSurfaceVariantColor) },
                                                 onClick = {
                                                     isFullScreen = true
                                                     showMoreMenu = false
                                                 }
                                             )
                                             DropdownMenuItem(
-                                                text = { Text("Print", color = Color(0xFFF1F5F9)) },
-                                                leadingIcon = { Icon(Icons.Default.Print, null, tint = Color(0xFFF1F5F9)) },
+                                                text = { Text("Print", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.Print, null, tint = readerOnSurfaceVariantColor) },
                                                 onClick = {
                                                     currentPdf?.let { printPdf(context, it) }
                                                     showMoreMenu = false
                                                 }
                                             )
                                             DropdownMenuItem(
-                                                text = { Text("Details", color = Color(0xFFF1F5F9)) },
-                                                leadingIcon = { Icon(Icons.Default.Info, null, tint = Color(0xFFF1F5F9)) },
+                                                text = { Text("Details", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.Info, null, tint = readerOnSurfaceVariantColor) },
                                                 onClick = {
                                                     showInfoDialog = true
                                                     showMoreMenu = false
                                                 }
                                             )
                                             DropdownMenuItem(
-                                                text = { Text("Voice Note", color = Color(0xFFF1F5F9)) },
+                                                text = { Text("Voice Note", color = readerOnSurfaceColor) },
                                                 leadingIcon = { Icon(Icons.Default.Mic, null, tint = Color(0xFF2F80ED)) },
                                                 onClick = {
                                                     showVoiceRecorderDialog = true
@@ -869,8 +876,8 @@ fun ReaderScreen(
                                     Brush.verticalGradient(
                                         colors = listOf(
                                             Color.Transparent,
-                                            Color(0xFF08090E).copy(alpha = 0.8f),
-                                            Color(0xFF08090E).copy(alpha = 0.95f)
+                                            readerBgColor.copy(alpha = 0.8f),
+                                            readerBgColor.copy(alpha = 0.95f)
                                         )
                                     )
                                 )
@@ -881,8 +888,8 @@ fun ReaderScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(24.dp))
-                                    .background(Color(0xFF111422).copy(alpha = 0.85f))
-                                    .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(24.dp))
+                                    .background(readerSurfaceColor.copy(alpha = 0.85f))
+                                    .border(1.dp, readerBorderColor, RoundedCornerShape(24.dp))
                                     .padding(horizontal = 16.dp, vertical = 12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {

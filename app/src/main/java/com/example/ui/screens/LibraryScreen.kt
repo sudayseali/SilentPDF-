@@ -26,6 +26,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -76,6 +77,10 @@ fun formatRelativeTime(timestamp: Long): String {
     return java.text.DateFormat.getDateInstance().format(java.util.Date(timestamp))
 }
 
+enum class CoverTheme {
+    QURAN, TECH, DESIGN, BUSINESS, GEOMETRIC, DEFAULT
+}
+
 @Composable
 fun BookCover(
     title: String,
@@ -84,17 +89,38 @@ fun BookCover(
     progress: Float = 0.0f,
     uriString: String? = null
 ) {
-    val titleHash = title.hashCode()
-    val gradientColors = remember(titleHash) {
-        val colorsList = listOf(
-            listOf(Color(0xFF1E3A8A), Color(0xFF0F172A)), // Deep Sapphire
-            listOf(Color(0xFF3B0764), Color(0xFF18012A)), // Royal Amethyst
-            listOf(Color(0xFF064E3B), Color(0xFF021E14)), // Deep Forest Emerald
-            listOf(Color(0xFF451A03), Color(0xFF1A0A02)), // Rich Amber
-            listOf(Color(0xFF1E1B4B), Color(0xFF0A071E)), // Midnight Indigo
-            listOf(Color(0xFF27272A), Color(0xFF09090B))  // Sleek Obsidian
+    val lowercaseTitle = title.lowercase()
+    val coverTheme = remember(title) {
+        when {
+            lowercaseTitle.contains("quran") || lowercaseTitle.contains("islam") || lowercaseTitle.contains("koran") || lowercaseTitle.contains("hadiis") || lowercaseTitle.contains("sunnah") -> CoverTheme.QURAN
+            lowercaseTitle.contains("computer") || lowercaseTitle.contains("science") || lowercaseTitle.contains("code") || lowercaseTitle.contains("notes") || lowercaseTitle.contains("cs") || lowercaseTitle.contains("tech") || lowercaseTitle.contains("program") -> CoverTheme.TECH
+            lowercaseTitle.contains("design") || lowercaseTitle.contains("art") || lowercaseTitle.contains("creative") || lowercaseTitle.contains("thinking") || lowercaseTitle.contains("graphic") -> CoverTheme.DESIGN
+            lowercaseTitle.contains("business") || lowercaseTitle.contains("finance") || lowercaseTitle.contains("plan") || lowercaseTitle.contains("money") || lowercaseTitle.contains("economy") -> CoverTheme.BUSINESS
+            lowercaseTitle.contains("lecture") || lowercaseTitle.contains("math") || lowercaseTitle.contains("physics") || lowercaseTitle.contains("school") || lowercaseTitle.contains("university") || lowercaseTitle.contains("class") -> CoverTheme.GEOMETRIC
+            else -> CoverTheme.DEFAULT
+        }
+    }
+
+    val defaultGradient = remember(title) {
+        val hash = kotlin.math.abs(title.hashCode())
+        val combinations = listOf(
+            listOf(Color(0xFF1A365D), Color(0xFF2A4365)), // Sapphire
+            listOf(Color(0xFF234E52), Color(0xFF2D3748)), // Teal Slate
+            listOf(Color(0xFF4A154B), Color(0xFF2E082D)), // Slack Aubergine
+            listOf(Color(0xFF5A2011), Color(0xFF2C0F08)), // Terracotta
+            listOf(Color(0xFF2D3748), Color(0xFF1A202C)), // Deep Charcoal
+            listOf(Color(0xFF3F3D56), Color(0xFF2F2E41))  // Classic Muted Blue-grey
         )
-        colorsList[kotlin.math.abs(titleHash) % colorsList.size]
+        combinations[hash % combinations.size]
+    }
+
+    val gradientColors = when (coverTheme) {
+        CoverTheme.QURAN -> listOf(Color(0xFF0C1E3C), Color(0xFF1B365D)) // Royal Navy
+        CoverTheme.TECH -> listOf(Color(0xFF0F2042), Color(0xFF1D53A0)) // Digital Cobalt
+        CoverTheme.DESIGN -> listOf(Color(0xFF0F0E17), Color(0xFF2E1C4E)) // Creative Violet
+        CoverTheme.BUSINESS -> listOf(Color(0xFF2C3E50), Color(0xFF34495E)) // Executive Slate
+        CoverTheme.GEOMETRIC -> listOf(Color(0xFFEA580C), Color(0xFFD97706)) // Amber Orange
+        CoverTheme.DEFAULT -> defaultGradient
     }
 
     val context = LocalContext.current
@@ -110,7 +136,7 @@ fun BookCover(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
             .background(Brush.verticalGradient(gradientColors))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
     ) {
         if (thumbnailFile != null) {
             AsyncImage(
@@ -132,27 +158,152 @@ fun BookCover(
                     )
             )
         } else {
-            // Decorative Abstract Lines inside cover
+            // Procedural Cover Art Canvas
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val w = size.width
                 val h = size.height
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.02f),
-                    radius = w * 0.55f,
-                    center = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.2f)
-                )
-                drawLine(
-                    color = Color.White.copy(alpha = 0.02f),
-                    start = androidx.compose.ui.geometry.Offset(0f, h * 0.72f),
-                    end = androidx.compose.ui.geometry.Offset(w, h * 0.35f),
-                    strokeWidth = 2f
-                )
-                drawLine(
-                    color = Color.White.copy(alpha = 0.02f),
-                    start = androidx.compose.ui.geometry.Offset(0f, h * 0.77f),
-                    end = androidx.compose.ui.geometry.Offset(w, h * 0.40f),
-                    strokeWidth = 2f
-                )
+                
+                when (coverTheme) {
+                    CoverTheme.QURAN -> {
+                        // Draw concentric gold rings
+                        drawCircle(
+                            color = Color(0xFFFCD34D).copy(alpha = 0.12f),
+                            radius = w * 0.32f,
+                            center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f)
+                        )
+                        drawCircle(
+                            color = Color(0xFFFCD34D).copy(alpha = 0.06f),
+                            radius = w * 0.45f,
+                            center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.45f)
+                        )
+                        // Radiant lines
+                        for (i in 0 until 12) {
+                            val angle = (i * 30) * (Math.PI / 180f)
+                            val startR = w * 0.32f
+                            val endR = w * 0.42f
+                            val startX = (w * 0.5f + startR * Math.cos(angle)).toFloat()
+                            val startY = (h * 0.45f + startR * Math.sin(angle)).toFloat()
+                            val endX = (w * 0.5f + endR * Math.cos(angle)).toFloat()
+                            val endY = (h * 0.45f + endR * Math.sin(angle)).toFloat()
+                            drawLine(
+                                color = Color(0xFFFCD34D).copy(alpha = 0.08f),
+                                start = androidx.compose.ui.geometry.Offset(startX, startY),
+                                end = androidx.compose.ui.geometry.Offset(endX, endY),
+                                strokeWidth = 2f
+                            )
+                        }
+                    }
+                    CoverTheme.TECH -> {
+                        // Circuit nodes
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.08f),
+                            start = androidx.compose.ui.geometry.Offset(0f, h * 0.2f),
+                            end = androidx.compose.ui.geometry.Offset(w * 0.4f, h * 0.2f),
+                            strokeWidth = 2f
+                        )
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.08f),
+                            start = androidx.compose.ui.geometry.Offset(w * 0.4f, h * 0.2f),
+                            end = androidx.compose.ui.geometry.Offset(w * 0.7f, h * 0.5f),
+                            strokeWidth = 2f
+                        )
+                        drawCircle(
+                            color = Color(0xFF2F80ED).copy(alpha = 0.3f),
+                            radius = 6.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(w * 0.7f, h * 0.5f)
+                        )
+                        drawLine(
+                            color = Color.White.copy(alpha = 0.08f),
+                            start = androidx.compose.ui.geometry.Offset(w * 0.2f, h * 0.8f),
+                            end = androidx.compose.ui.geometry.Offset(w * 0.6f, h * 0.8f),
+                            strokeWidth = 2f
+                        )
+                        drawCircle(
+                            color = Color(0xFF0D9488).copy(alpha = 0.3f),
+                            radius = 5.dp.toPx(),
+                            center = androidx.compose.ui.geometry.Offset(w * 0.6f, h * 0.8f)
+                        )
+                    }
+                    CoverTheme.DESIGN -> {
+                        // Modern fluid Bezier waves
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(0f, h * 0.6f)
+                            cubicTo(
+                                w * 0.25f, h * 0.45f,
+                                w * 0.75f, h * 0.75f,
+                                w, h * 0.55f
+                            )
+                            lineTo(w, h)
+                            lineTo(0f, h)
+                            close()
+                        }
+                        drawPath(
+                            path = path,
+                            brush = Brush.verticalGradient(listOf(Color(0xFF2F80ED).copy(alpha = 0.15f), Color.Transparent))
+                        )
+                        val linePath = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(0f, h * 0.55f)
+                            cubicTo(
+                                w * 0.25f, h * 0.4f,
+                                w * 0.75f, h * 0.7f,
+                                w, h * 0.5f
+                            )
+                        }
+                        drawPath(
+                            path = linePath,
+                            color = Color.White.copy(alpha = 0.1f),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f)
+                        )
+                    }
+                    CoverTheme.BUSINESS -> {
+                        // Skyscraper silhouettes
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.05f),
+                            size = androidx.compose.ui.geometry.Size(w * 0.25f, h * 0.45f),
+                            topLeft = androidx.compose.ui.geometry.Offset(w * 0.15f, h * 0.55f)
+                        )
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.07f),
+                            size = androidx.compose.ui.geometry.Size(w * 0.3f, h * 0.55f),
+                            topLeft = androidx.compose.ui.geometry.Offset(w * 0.38f, h * 0.45f)
+                        )
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.04f),
+                            size = androidx.compose.ui.geometry.Size(w * 0.22f, h * 0.35f),
+                            topLeft = androidx.compose.ui.geometry.Offset(w * 0.7f, h * 0.65f)
+                        )
+                    }
+                    CoverTheme.GEOMETRIC -> {
+                        // Overlapping triangles
+                        val p1 = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(w * 0.1f, h * 0.9f)
+                            lineTo(w * 0.5f, h * 0.4f)
+                            lineTo(w * 0.9f, h * 0.9f)
+                            close()
+                        }
+                        drawPath(p1, Color.White.copy(alpha = 0.06f))
+                        val p2 = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(w * 0.3f, h * 0.85f)
+                            lineTo(w * 0.7f, h * 0.35f)
+                            lineTo(w * 0.95f, h * 0.85f)
+                            close()
+                        }
+                        drawPath(p2, Color.White.copy(alpha = 0.04f))
+                    }
+                    CoverTheme.DEFAULT -> {
+                        // Soft glowing bubbles in corners
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.05f),
+                            radius = w * 0.5f,
+                            center = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.2f)
+                        )
+                        drawCircle(
+                            color = Color.White.copy(alpha = 0.03f),
+                            radius = w * 0.4f,
+                            center = androidx.compose.ui.geometry.Offset(w * 0.1f, h * 0.7f)
+                        )
+                    }
+                }
             }
         }
 
@@ -164,8 +315,8 @@ fun BookCover(
                 .background(
                     Brush.horizontalGradient(
                         colors = listOf(
-                            Color.Black.copy(alpha = 0.45f),
-                            Color.Black.copy(alpha = 0.1f),
+                            Color.Black.copy(alpha = 0.4f),
+                            Color.Black.copy(alpha = 0.08f),
                             Color.Transparent
                         )
                     )
@@ -179,7 +330,7 @@ fun BookCover(
                 .align(Alignment.TopStart)
                 .padding(8.dp)
                 .background(Color(0xFFEF4444), RoundedCornerShape(4.dp))
-                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .padding(horizontal = 5.dp, vertical = 2.dp)
         ) {
             Text(
                 text = "PDF",
@@ -190,65 +341,81 @@ fun BookCover(
             )
         }
 
-        // Bookmark indicator
-        if (isFavorite) {
-            Icon(
-                imageVector = Icons.Filled.Bookmark,
-                contentDescription = null,
-                tint = Color(0xFFFF9500),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(end = 8.dp)
-                    .size(16.dp)
-            )
-        }
-
         if (thumbnailFile == null) {
-            // Elegant Book Typography (Centered)
+            // Dynamic Book Typography (Centered & Structured based on title)
+            val formattedTitle = remember(title) {
+                val cleaned = title.removeSuffix(".pdf").removeSuffix(".PDF")
+                    .replace("_", " ")
+                    .replace("-", " ")
+                    .trim()
+                if (cleaned.length > 24) cleaned.take(22) + "..." else cleaned
+            }
+            
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.Center)
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
+                val iconColor = if (coverTheme == CoverTheme.QURAN) Color(0xFFFCD34D).copy(alpha = 0.4f) else Color.White.copy(alpha = 0.15f)
                 Icon(
-                    imageVector = Icons.Filled.MenuBook,
+                    imageVector = if (coverTheme == CoverTheme.QURAN) Icons.Filled.MenuBook else Icons.Filled.Description,
                     contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.15f),
-                    modifier = Modifier.size(22.dp)
+                    tint = iconColor,
+                    modifier = Modifier.size(24.dp)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+                
                 Text(
-                    text = title.removeSuffix(".pdf").take(30),
-                    color = Color.White,
+                    text = formattedTitle,
+                    color = if (coverTheme == CoverTheme.QURAN) Color(0xFFFCD34D) else Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    lineHeight = 14.sp,
+                    fontSize = 12.sp,
+                    lineHeight = 15.sp,
                     textAlign = TextAlign.Center,
                     maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
+                
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                val labelText = when (coverTheme) {
+                    CoverTheme.QURAN -> "The Holy Quran"
+                    CoverTheme.TECH -> "Tech Notes"
+                    CoverTheme.DESIGN -> "Design Thinking"
+                    CoverTheme.BUSINESS -> "Strategic Plan"
+                    CoverTheme.GEOMETRIC -> "Class Lecture"
+                    CoverTheme.DEFAULT -> "Document"
+                }
+                
+                val labelColor = if (coverTheme == CoverTheme.QURAN) Color(0xFFFCD34D).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.4f)
+                
+                Text(
+                    text = labelText.uppercase(),
+                    color = labelColor,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 7.5.sp,
+                    letterSpacing = 0.8.sp
+                )
             }
         }
 
-        // Mini Reading status pill at bottom
+        // Mini Reading status progress bar inside the cover at bottom
         if (progress > 0f) {
-            val statusText = if (progress >= 1.0f) "Completed" else "${(progress * 100).toInt()}% Read"
-            val statusColor = if (progress >= 1.0f) Color(0xFF10B981) else Color(0xFF2F80ED)
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.65f))
-                    .padding(vertical = 3.dp),
-                contentAlignment = Alignment.Center
+                    .height(3.dp)
+                    .background(Color.White.copy(alpha = 0.25f))
             ) {
-                Text(
-                    text = statusText,
-                    color = statusColor,
-                    fontSize = 7.5.sp,
-                    fontWeight = FontWeight.Bold
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progress)
+                        .background(Color(0xFF2F80ED))
                 )
             }
         }
@@ -264,57 +431,64 @@ fun QuickActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isTrueDarkMode = isSystemInDarkTheme()
+    
+    // Choose specific colors for icons as in screenshot
+    val iconTint = when (title) {
+        "Favorites" -> Color(0xFFFFA000) // Star Orange/Gold
+        else -> Color(0xFF2F80ED) // Clean blue
+    }
+    
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) Color(0xFF1B2C4E) else Color(0xFF111422)
+            containerColor = if (isSelected) {
+                Color(0xFFEBF4FF)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         ),
         border = BorderStroke(
             1.dp,
-            if (isSelected) Color(0xFF2F80ED).copy(alpha = 0.4f) else Color(0xFF1E263D)
+            if (isSelected) Color(0xFF2F80ED).copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
         ),
         modifier = modifier
-            .height(84.dp)
+            .height(115.dp)
+            .shadow(
+                elevation = if (isSelected) 3.dp else 1.dp,
+                shape = RoundedCornerShape(16.dp),
+                clip = false
+            )
             .clickable { onClick() }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.Start
+                .padding(vertical = 12.dp, horizontal = 8.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isSelected) Color(0xFF2F80ED).copy(alpha = 0.2f) else Color(0xFF1E263D)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = if (isSelected) Color(0xFF2F80ED) else Color(0xFF94A3B8),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-                Text(
-                    text = count,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) Color(0xFF2F80ED) else Color(0xFFF1F5F9)
-                )
-            }
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = iconTint,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
             Text(
                 text = title,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = count,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isSelected) Color(0xFFF1F5F9) else Color(0xFF94A3B8)
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
             )
         }
     }
@@ -330,11 +504,12 @@ fun ContinueReadingCard(
     
     Card(
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111422)),
-        border = BorderStroke(1.dp, Color(0xFF1E263D)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         modifier = modifier
             .width(230.dp)
             .height(104.dp)
+            .shadow(1.dp, RoundedCornerShape(16.dp))
             .clickable { onClick() }
     ) {
         Row(
@@ -363,7 +538,7 @@ fun ContinueReadingCard(
                         text = pdf.fileName,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF1F5F9),
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -371,7 +546,7 @@ fun ContinueReadingCard(
                     Text(
                         text = formatFileSize(pdf.fileSize),
                         fontSize = 10.sp,
-                        color = Color(0xFF94A3B8)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
                 }
                 
@@ -384,7 +559,7 @@ fun ContinueReadingCard(
                         Text(
                             text = if (pdf.totalPages > 0) "P. ${pdf.lastPageRead}/${pdf.totalPages}" else "Opened",
                             fontSize = 8.sp,
-                            color = Color(0xFF64748B),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             fontWeight = FontWeight.Bold
                         )
                         Text(
@@ -398,7 +573,7 @@ fun ContinueReadingCard(
                     LinearProgressIndicator(
                         progress = progress,
                         color = Color(0xFF2F80ED),
-                        trackColor = Color(0xFF1E263D),
+                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(3.dp)
@@ -419,67 +594,61 @@ fun FolderCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111422)),
-        border = BorderStroke(1.dp, Color(0xFF1E263D)),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         modifier = modifier
-            .width(135.dp)
-            .height(105.dp)
+            .width(185.dp) // Perfect width for horizontal scrolling folders row
+            .height(68.dp)
+            .shadow(1.dp, RoundedCornerShape(14.dp))
             .clickable { onClick() }
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2F80ED).copy(alpha = 0.15f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Folder,
-                        contentDescription = null,
-                        tint = Color(0xFF2F80ED),
-                        modifier = Modifier.size(20.dp)
+                Icon(
+                    imageVector = Icons.Filled.Folder,
+                    contentDescription = null,
+                    tint = Color(0xFF2F80ED), // Clean vibrant folder blue
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(verticalArrangement = Arrangement.Center) {
+                    Text(
+                        text = name,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                }
-                
-                IconButton(
-                    onClick = onMenuClick,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = null,
-                        tint = Color(0xFF64748B),
-                        modifier = Modifier.size(16.dp)
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "$count files",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                     )
                 }
             }
-            
-            Column {
-                Text(
-                    text = name,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFF1F5F9),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "$count files",
-                    fontSize = 10.sp,
-                    color = Color(0xFF94A3B8)
+            IconButton(
+                onClick = onMenuClick,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
@@ -499,101 +668,106 @@ fun GridPdfCard(
     var showMenu by remember { mutableStateOf(false) }
     val progress = if (pdf.totalPages > 0) pdf.lastPageRead.toFloat() / pdf.totalPages.toFloat() else 0.0f
 
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF111422)),
-        border = BorderStroke(1.dp, Color(0xFF1E263D)),
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onClick() }
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.72f) // Beautiful, professional book cover ratio
+        ) {
+            BookCover(
+                title = pdf.fileName,
+                isFavorite = pdf.isFavorite,
+                progress = progress,
+                uriString = pdf.uriString,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // More Options overlay button (Subtle translucent grey circle matching screenshot)
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.85f)
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.85f))
+                    .clickable { showMenu = true },
+                contentAlignment = Alignment.Center
             ) {
-                BookCover(
-                    title = pdf.fileName,
-                    isFavorite = pdf.isFavorite,
-                    progress = progress,
-                    uriString = pdf.uriString,
-                    modifier = Modifier.fillMaxSize()
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = Color(0xFF475569), // Sleek grey icon
+                    modifier = Modifier.size(16.dp)
                 )
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(6.dp)
-                        .size(26.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .clickable { showMenu = true },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "Options",
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = showMenu,
-                    onDismissRequest = { showMenu = false },
-                    modifier = Modifier.background(Color(0xFF191D31))
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Move to Folder", color = Color(0xFFF1F5F9)) },
-                        onClick = { showMenu = false; onMoveToFolder() },
-                        leadingIcon = { Icon(Icons.Outlined.Folder, null, tint = Color(0xFF2F80ED)) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Share", color = Color(0xFFF1F5F9)) },
-                        onClick = { showMenu = false; onShare() },
-                        leadingIcon = { Icon(Icons.Outlined.Share, null, tint = Color(0xFF2F80ED)) }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete", color = Color(0xFFEF4444)) },
-                        onClick = { showMenu = false; onDelete() },
-                        leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = Color(0xFFEF4444)) }
-                    )
-                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = pdf.fileName,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFFF1F5F9),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            Spacer(modifier = Modifier.height(2.dp))
-            
-            Text(
-                text = "${formatFileSize(pdf.fileSize)} • ${formatRelativeTime(pdf.lastAccessTime)}",
-                fontSize = 9.sp,
-                color = Color(0xFF94A3B8)
-            )
-
-            if (progress > 0.0f) {
-                Spacer(modifier = Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = progress,
-                    color = Color(0xFF10B981),
-                    trackColor = Color(0xFF1E263D),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(CircleShape)
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+                modifier = Modifier.background(MaterialTheme.colorScheme.surface)
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Move to Folder", color = MaterialTheme.colorScheme.onSurface) },
+                    onClick = { showMenu = false; onMoveToFolder() },
+                    leadingIcon = { Icon(Icons.Outlined.Folder, null, tint = Color(0xFF2F80ED)) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Favorite", color = MaterialTheme.colorScheme.onSurface) },
+                    onClick = { showMenu = false; onFavoriteToggle() },
+                    leadingIcon = { Icon(if (pdf.isFavorite) Icons.Filled.Star else Icons.Outlined.StarOutline, null, tint = Color(0xFFFF9500)) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Share", color = MaterialTheme.colorScheme.onSurface) },
+                    onClick = { showMenu = false; onShare() },
+                    leadingIcon = { Icon(Icons.Outlined.Share, null, tint = Color(0xFF2F80ED)) }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete", color = Color(0xFFEF4444)) },
+                    onClick = { showMenu = false; onDelete() },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, null, tint = Color(0xFFEF4444)) }
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Title and Favorite star in a single line
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = pdf.fileName,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            if (pdf.isFavorite) {
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Filled.Star,
+                    contentDescription = "Starred",
+                    tint = Color(0xFF2F80ED), // Beautiful filled blue star as in screenshot
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(2.dp))
+        
+        Text(
+            text = "${formatFileSize(pdf.fileSize)} • ${formatRelativeTime(pdf.lastAccessTime)}",
+            fontSize = 11.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+        )
     }
 }
 
@@ -661,6 +835,7 @@ fun LibraryScreen(
     val pdfsList by viewModel.libraryPdfs.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
+    val isTrueDarkMode by viewModel.isTrueDarkMode.collectAsState()
 
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var folderNameInput by remember { mutableStateOf("") }
@@ -729,13 +904,13 @@ fun LibraryScreen(
     }
 
     Scaffold(
-        containerColor = Color(0xFF08090E), // Ultra luxury Space Dark background
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             NavigationBar(
-                containerColor = Color(0xFF0C0F1A),
+                containerColor = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp,
                 modifier = Modifier.border(
-                    BorderStroke(1.dp, Color(0xFF1E263D).copy(alpha = 0.5f)),
+                    BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)),
                     RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 )
             ) {
@@ -747,9 +922,9 @@ fun LibraryScreen(
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0xFF2F80ED),
                         selectedTextColor = Color(0xFF2F80ED),
-                        indicatorColor = Color(0xFF1B2C4E),
-                        unselectedIconColor = Color(0xFF64748B),
-                        unselectedTextColor = Color(0xFF64748B)
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 )
                 NavigationBarItem(
@@ -760,9 +935,9 @@ fun LibraryScreen(
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0xFF2F80ED),
                         selectedTextColor = Color(0xFF2F80ED),
-                        indicatorColor = Color(0xFF1B2C4E),
-                        unselectedIconColor = Color(0xFF64748B),
-                        unselectedTextColor = Color(0xFF64748B)
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 )
                 NavigationBarItem(
@@ -773,9 +948,9 @@ fun LibraryScreen(
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0xFF2F80ED),
                         selectedTextColor = Color(0xFF2F80ED),
-                        indicatorColor = Color(0xFF1B2C4E),
-                        unselectedIconColor = Color(0xFF64748B),
-                        unselectedTextColor = Color(0xFF64748B)
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 )
                 NavigationBarItem(
@@ -786,9 +961,9 @@ fun LibraryScreen(
                     colors = NavigationBarItemDefaults.colors(
                         selectedIconColor = Color(0xFF2F80ED),
                         selectedTextColor = Color(0xFF2F80ED),
-                        indicatorColor = Color(0xFF1B2C4E),
-                        unselectedIconColor = Color(0xFF64748B),
-                        unselectedTextColor = Color(0xFF64748B)
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
                 )
             }
@@ -804,27 +979,30 @@ fun LibraryScreen(
             )
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize().background(Color(0xFF08090E))) {
-            // Premium subtle glowing background orbs
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            val isDark = isTrueDarkMode
+            // Premium subtle glowing background orbs (Drawn in Dark Mode only)
             Canvas(modifier = Modifier.fillMaxSize()) {
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF2F80ED).copy(alpha = 0.2f), Color.Transparent),
+                if (isDark) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF2F80ED).copy(alpha = 0.12f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.1f),
+                            radius = size.width * 0.8f
+                        ),
                         center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.1f),
                         radius = size.width * 0.8f
-                    ),
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.8f, size.height * 0.1f),
-                    radius = size.width * 0.8f
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color(0xFF9C27B0).copy(alpha = 0.1f), Color.Transparent),
+                    )
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFF9C27B0).copy(alpha = 0.08f), Color.Transparent),
+                            center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.6f),
+                            radius = size.width * 0.7f
+                        ),
                         center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.6f),
                         radius = size.width * 0.7f
-                    ),
-                    center = androidx.compose.ui.geometry.Offset(size.width * 0.1f, size.height * 0.6f),
-                    radius = size.width * 0.7f
-                )
+                    )
+                }
             }
             LazyColumn(
                 modifier = modifier
@@ -853,7 +1031,7 @@ fun LibraryScreen(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Row {
-                            Text("Silent", fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color(0xFFF1F5F9))
+                            Text("Silent", fontWeight = FontWeight.Black, fontSize = 24.sp, color = MaterialTheme.colorScheme.onBackground)
                             Text("PDF", fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color(0xFF2F80ED))
                         }
                     }
@@ -866,7 +1044,7 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = if (isPinConfigured) Icons.Default.Lock else Icons.Outlined.Lock,
                                 contentDescription = "Security Settings",
-                                tint = if (isPinConfigured) Color(0xFFFF9500) else Color(0xFF94A3B8),
+                                tint = if (isPinConfigured) Color(0xFFFF9500) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -876,7 +1054,7 @@ fun LibraryScreen(
                             modifier = Modifier
                                 .size(38.dp)
                                 .clip(CircleShape)
-                                .background(Color(0xFF1E263D))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.WorkspacePremium,
@@ -903,23 +1081,23 @@ fun LibraryScreen(
                         modifier = Modifier
                             .weight(1f)
                             .height(52.dp),
-                        placeholder = { Text("Search PDF files...", color = Color(0xFF64748B), fontSize = 14.sp) },
-                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = Color(0xFF94A3B8)) },
+                        placeholder = { Text("Search PDF files...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f), fontSize = 14.sp) },
+                        leadingIcon = { Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, null, tint = Color(0xFF94A3B8))
+                                    Icon(Icons.Default.Clear, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                                 }
                             }
                         },
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFF111422),
-                            focusedContainerColor = Color(0xFF111422),
-                            unfocusedBorderColor = Color(0xFF1E263D),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                             focusedBorderColor = Color(0xFF2F80ED),
-                            unfocusedTextColor = Color(0xFFF1F5F9),
-                            focusedTextColor = Color(0xFFF1F5F9)
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
                         ),
                         singleLine = true
                     )
@@ -930,8 +1108,8 @@ fun LibraryScreen(
                         modifier = Modifier
                             .size(52.dp)
                             .clip(RoundedCornerShape(16.dp))
-                            .background(Color(0xFF111422))
-                            .border(1.dp, Color(0xFF1E263D), RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
                             .clickable { showSortMenu = true },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1066,7 +1244,7 @@ fun LibraryScreen(
                                 text = "Continue Reading",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp,
-                                color = Color(0xFFF1F5F9)
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
                                 text = "View all",
@@ -1114,7 +1292,7 @@ fun LibraryScreen(
                                 text = "Folders",
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp,
-                                color = Color(0xFFF1F5F9)
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
                                 text = "+ New Folder",
@@ -1149,27 +1327,43 @@ fun LibraryScreen(
                                     onMenuClick = {}
                                 )
                             }
-                            // CTA Add Folder Card
+                            // CTA Add Folder Card (Wide horizontal format matching FolderCard size)
                             item {
                                 Card(
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111422).copy(alpha = 0.5f)),
-                                    border = BorderStroke(1.dp, Color(0xFF1E263D).copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(14.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                                    ),
+                                    border = BorderStroke(
+                                        1.dp,
+                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
+                                    ),
                                     modifier = Modifier
-                                        .width(125.dp)
-                                        .height(105.dp)
+                                        .width(185.dp)
+                                        .height(68.dp)
+                                        .shadow(0.5.dp, RoundedCornerShape(14.dp))
                                         .clickable { showCreateFolderDialog = true }
                                 ) {
-                                    Column(
+                                    Row(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .padding(12.dp),
-                                        verticalArrangement = Arrangement.Center,
-                                        horizontalAlignment = Alignment.CenterHorizontally
+                                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
-                                        Icon(Icons.Default.Add, null, tint = Color(0xFF2F80ED), modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Text("Add Folder", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFF94A3B8))
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = Color(0xFF2F80ED),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = "Add Folder",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
                             }
@@ -1198,7 +1392,7 @@ fun LibraryScreen(
                         },
                         fontWeight = FontWeight.Black,
                         fontSize = 16.sp,
-                        color = Color(0xFFF1F5F9)
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     
                     if (selectedCategory != null) {
@@ -1296,7 +1490,7 @@ fun LibraryScreen(
     if (showSettingsSheet) {
         ModalBottomSheet(
             onDismissRequest = { showSettingsSheet = false },
-            containerColor = Color(0xFF111422)
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -1307,32 +1501,49 @@ fun LibraryScreen(
                     text = "Settings",
                     fontWeight = FontWeight.Black,
                     fontSize = 20.sp,
-                    color = Color(0xFFF1F5F9),
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
                 ListItem(
-                    headlineContent = { Text("App Security (PIN)", color = Color(0xFFF1F5F9)) },
+                    headlineContent = { Text("App Security (PIN)", color = MaterialTheme.colorScheme.onSurface) },
                     leadingContent = { Icon(Icons.Outlined.Lock, null, tint = Color(0xFF2F80ED)) },
                     modifier = Modifier.clickable { showSettingsSheet = false; showSecurityDialog = true },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
                 ListItem(
-                    headlineContent = { Text("Help / Support", color = Color(0xFFF1F5F9)) },
+                    headlineContent = { Text("Help / Support", color = MaterialTheme.colorScheme.onSurface) },
                     leadingContent = { Icon(Icons.Outlined.SupportAgent, null, tint = Color(0xFF2F80ED)) },
                     modifier = Modifier.clickable { showSettingsSheet = false; showSupportDialog = true },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
                 ListItem(
-                    headlineContent = { Text("Sort Options", color = Color(0xFFF1F5F9)) },
+                    headlineContent = { Text("Sort Options", color = MaterialTheme.colorScheme.onSurface) },
                     leadingContent = { Icon(Icons.Outlined.Sort, null, tint = Color(0xFF2F80ED)) },
                     modifier = Modifier.clickable { showSettingsSheet = false; showSortMenu = true },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
                 ListItem(
-                    headlineContent = { Text("Toggle View Mode", color = Color(0xFFF1F5F9)) },
+                    headlineContent = { Text("Toggle View Mode", color = MaterialTheme.colorScheme.onSurface) },
                     leadingContent = { Icon(if (isGridView) Icons.Outlined.ViewList else Icons.Outlined.GridView, null, tint = Color(0xFF2F80ED)) },
                     modifier = Modifier.clickable { showSettingsSheet = false; viewModel.toggleGridView() },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+                ListItem(
+                    headlineContent = { Text("True Dark Mode", color = MaterialTheme.colorScheme.onSurface) },
+                    supportingContent = { Text(if (isTrueDarkMode) "Active (OLED Black)" else "Inactive (Light Mode)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                    leadingContent = { Icon(Icons.Outlined.Contrast, null, tint = Color(0xFF2F80ED)) },
+                    trailingContent = {
+                        Switch(
+                            checked = isTrueDarkMode,
+                            onCheckedChange = { viewModel.toggleTrueDarkMode() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFF2F80ED),
+                                checkedTrackColor = Color(0xFF2F80ED).copy(alpha = 0.4f)
+                            )
+                        )
+                    },
+                    modifier = Modifier.clickable { viewModel.toggleTrueDarkMode() },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
             }
@@ -1343,24 +1554,24 @@ fun LibraryScreen(
     if (showCreateFolderDialog) {
         AlertDialog(
             onDismissRequest = { showCreateFolderDialog = false; folderNameInput = "" },
-            title = { Text("Create New Folder", fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9)) },
+            title = { Text("Create New Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Enter the name of the folder you want to create to organize your books.", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                    Text("Enter the name of the folder you want to create to organize your books.", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     OutlinedTextField(
                         value = folderNameInput,
                         onValueChange = { folderNameInput = it },
-                        placeholder = { Text("Example: Islamic Lectures") },
+                        placeholder = { Text("Example: Islamic Lectures", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFF08090E),
-                            focusedContainerColor = Color(0xFF08090E),
-                            unfocusedBorderColor = Color(0xFF1E263D),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
                             focusedBorderColor = Color(0xFF2F80ED),
-                            unfocusedTextColor = Color(0xFFF1F5F9),
-                            focusedTextColor = Color(0xFFF1F5F9)
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -1382,10 +1593,10 @@ fun LibraryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showCreateFolderDialog = false; folderNameInput = "" }) {
-                    Text("Cancel", color = Color(0xFF94A3B8))
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
                 }
             },
-            containerColor = Color(0xFF111422),
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -1397,13 +1608,13 @@ fun LibraryScreen(
 
         AlertDialog(
             onDismissRequest = { pdfToMoveToFolder = null },
-            title = { Text("Move to Folder", fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9)) },
+            title = { Text("Move to Folder", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Select the folder you want to move '${pdf.fileName}' to:", fontSize = 13.sp, color = Color(0xFF94A3B8))
+                    Text("Select the folder you want to move '${pdf.fileName}' to:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier
@@ -1424,7 +1635,7 @@ fun LibraryScreen(
                                 colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF2F80ED))
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Default Folder", fontSize = 14.sp, color = Color(0xFFF1F5F9))
+                            Text("Default Folder", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
                         }
                         allCategories.forEach { cat ->
                             Row(
@@ -1440,30 +1651,30 @@ fun LibraryScreen(
                                     colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF2F80ED))
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(cat, fontSize = 14.sp, color = Color(0xFFF1F5F9))
+                                Text(cat, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
                             }
                         }
                     }
-                    HorizontalDivider(color = Color(0xFF1E263D))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("Or create a new folder:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9))
+                        Text("Or create a new folder:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                         OutlinedTextField(
                             value = customCategoryInput,
                             onValueChange = {
                                 customCategoryInput = it
                                 if (it.isNotBlank()) selectedCategoryToMove = it.trim()
                             },
-                            placeholder = { Text("Enter new name...") },
+                            placeholder = { Text("Enter new name...", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                unfocusedContainerColor = Color(0xFF08090E),
-                                focusedContainerColor = Color(0xFF08090E),
-                                unfocusedBorderColor = Color(0xFF1E263D),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                                 focusedBorderColor = Color(0xFF2F80ED),
-                                unfocusedTextColor = Color(0xFFF1F5F9),
-                                focusedTextColor = Color(0xFFF1F5F9)
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -1491,9 +1702,9 @@ fun LibraryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pdfToMoveToFolder = null }) { Text("Cancel", color = Color(0xFF94A3B8)) }
+                TextButton(onClick = { pdfToMoveToFolder = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) }
             },
-            containerColor = Color(0xFF111422),
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -1501,10 +1712,10 @@ fun LibraryScreen(
     if (showSupportDialog) {
         AlertDialog(
             onDismissRequest = { showSupportDialog = false },
-            title = { Text("Help / Support", fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9)) },
+            title = { Text("Help / Support", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("If you encounter any issues, please contact us via WhatsApp.", color = Color(0xFF94A3B8))
+                    Text("If you encounter any issues, please contact us via WhatsApp.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         "Note: Only chat messages are allowed. Voice and video calls are not permitted.",
                         color = Color(0xFFEF4444),
@@ -1531,9 +1742,9 @@ fun LibraryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showSupportDialog = false }) { Text("Cancel", color = Color(0xFF94A3B8)) }
+                TextButton(onClick = { showSupportDialog = false }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) }
             },
-            containerColor = Color(0xFF111422),
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -1542,8 +1753,8 @@ fun LibraryScreen(
         val pdf = pdfToDelete!!
         AlertDialog(
             onDismissRequest = { pdfToDelete = null },
-            title = { Text("Delete PDF", fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9)) },
-            text = { Text("Are you sure you want to delete '${pdf.fileName}'? This action cannot be undone.", color = Color(0xFF94A3B8)) },
+            title = { Text("Delete PDF", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+            text = { Text("Are you sure you want to delete '${pdf.fileName}'? This action cannot be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = { viewModel.deletePdf(pdf); pdfToDelete = null },
@@ -1551,9 +1762,9 @@ fun LibraryScreen(
                 ) { Text("OK", color = Color.White) }
             },
             dismissButton = {
-                TextButton(onClick = { pdfToDelete = null }) { Text("Cancel", color = Color(0xFF94A3B8)) }
+                TextButton(onClick = { pdfToDelete = null }) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) }
             },
-            containerColor = Color(0xFF111422),
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(16.dp)
         )
     }
@@ -1561,7 +1772,7 @@ fun LibraryScreen(
     if (showSortMenu) {
         AlertDialog(
             onDismissRequest = { showSortMenu = false },
-            title = { Text("Sort Books", fontWeight = FontWeight.Bold, color = Color(0xFFF1F5F9)) },
+            title = { Text("Sort Books", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val options = listOf(
@@ -1581,7 +1792,7 @@ fun LibraryScreen(
                             Icon(
                                 imageVector = icon,
                                 contentDescription = null,
-                                tint = if (sortBy == index) Color(0xFF2F80ED) else Color(0xFF94A3B8),
+                                tint = if (sortBy == index) Color(0xFF2F80ED) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
@@ -1589,7 +1800,7 @@ fun LibraryScreen(
                                 text = title,
                                 modifier = Modifier.weight(1f),
                                 fontWeight = if (sortBy == index) FontWeight.Bold else FontWeight.Normal,
-                                color = if (sortBy == index) Color(0xFF2F80ED) else Color(0xFFF1F5F9)
+                                color = if (sortBy == index) Color(0xFF2F80ED) else MaterialTheme.colorScheme.onSurface
                             )
                             RadioButton(
                                 selected = sortBy == index,
@@ -1601,8 +1812,8 @@ fun LibraryScreen(
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { showSortMenu = false }) { Text("Close", color = Color(0xFF94A3B8)) } },
-            containerColor = Color(0xFF111422),
+            dismissButton = { TextButton(onClick = { showSortMenu = false }) { Text("Close", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) } },
+            containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(24.dp)
         )
     }
@@ -1645,69 +1856,69 @@ fun SecurityDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 if (isPinConfigured && step == 0) {
-                    Text("App PIN is currently active. Your documents are safe.", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                    Text("App PIN is currently active. Your documents are safe.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (error != null) Text(error ?: "", color = Color(0xFFEF4444), fontSize = 12.sp)
                     OutlinedTextField(
                         value = currentPinInput,
                         onValueChange = { if (it.length <= 4) { currentPinInput = it; error = null } },
-                        label = { Text("Enter PIN to disable", color = Color(0xFF64748B)) },
-                        placeholder = { Text("4 digits", color = Color(0xFF64748B)) },
+                        label = { Text("Enter PIN to disable", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                        placeholder = { Text("4 digits", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFF08090E),
-                            focusedContainerColor = Color(0xFF08090E),
-                            unfocusedBorderColor = Color(0xFF1E263D),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                             focusedBorderColor = Color(0xFF2F80ED),
-                            unfocusedTextColor = Color(0xFFF1F5F9),
-                            focusedTextColor = Color(0xFFF1F5F9)
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 } else if (step == 1) {
-                    Text("Please enter a 4-digit PIN to lock the app.", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                    Text("Please enter a 4-digit PIN to lock the app.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (error != null) Text(error ?: "", color = Color(0xFFEF4444), fontSize = 12.sp)
                     OutlinedTextField(
                         value = pinText,
                         onValueChange = { if (it.length <= 4) { pinText = it; error = null } },
-                        label = { Text("New PIN", color = Color(0xFF64748B)) },
-                        placeholder = { Text("4 digits", color = Color(0xFF64748B)) },
+                        label = { Text("New PIN", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                        placeholder = { Text("4 digits", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFF08090E),
-                            focusedContainerColor = Color(0xFF08090E),
-                            unfocusedBorderColor = Color(0xFF1E263D),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                             focusedBorderColor = Color(0xFF2F80ED),
-                            unfocusedTextColor = Color(0xFFF1F5F9),
-                            focusedTextColor = Color(0xFFF1F5F9)
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 } else if (step == 2) {
-                    Text("Repeat the PIN you just entered to confirm.", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                    Text("Repeat the PIN you just entered to confirm.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (error != null) Text(error ?: "", color = Color(0xFFEF4444), fontSize = 12.sp)
                     OutlinedTextField(
                         value = confirmPinText,
                         onValueChange = { if (it.length <= 4) { confirmPinText = it; error = null } },
-                        label = { Text("Confirm PIN", color = Color(0xFF64748B)) },
-                        placeholder = { Text("4 digits", color = Color(0xFF64748B)) },
+                        label = { Text("Confirm PIN", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                        placeholder = { Text("4 digits", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)) },
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            unfocusedContainerColor = Color(0xFF08090E),
-                            focusedContainerColor = Color(0xFF08090E),
-                            unfocusedBorderColor = Color(0xFF1E263D),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f),
                             focusedBorderColor = Color(0xFF2F80ED),
-                            unfocusedTextColor = Color(0xFFF1F5F9),
-                            focusedTextColor = Color(0xFFF1F5F9)
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
@@ -1738,8 +1949,8 @@ fun SecurityDialog(
                 )
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = Color(0xFF94A3B8)) } },
-        containerColor = Color(0xFF111422),
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)) } },
+        containerColor = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(24.dp)
     )
 }
