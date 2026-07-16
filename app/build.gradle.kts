@@ -21,6 +21,15 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -28,6 +37,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
@@ -67,7 +77,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     
     // Kotlinx Serialization
-    // Not in catalog, but okay
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     
     // Coil
