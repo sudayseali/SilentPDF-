@@ -12,8 +12,8 @@ android {
         applicationId = "com.silentpdf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,10 +23,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            storeFile = rootProject.file("silentpdf.keystore")
+            storePassword = "silentpdf2024"
+            keyAlias = "silentpdf"
+            keyPassword = "silentpdf2024"
         }
     }
 
