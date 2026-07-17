@@ -1,4 +1,4 @@
-package com.example.data.repository
+package com.silentpdf.app.data.repository
 
 import android.content.Context
 import android.net.Uri

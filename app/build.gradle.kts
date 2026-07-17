@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example"
+    namespace = "com.silentpdf.app"
     compileSdk = 36
 
     defaultConfig {

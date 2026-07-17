@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.silentpdf.app.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,7 +19,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.viewmodel.SilentPdfViewModel
+import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
 import kotlinx.coroutines.delay
 
 @Composable

@@ -1,4 +1,4 @@
-package com.example
+package com.silentpdf.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,11 +15,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.ui.screens.LibraryScreen
-import com.example.ui.screens.ReaderScreen
-import com.example.ui.screens.PinLockScreen
-import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.viewmodel.SilentPdfViewModel
+import com.silentpdf.app.ui.screens.LibraryScreen
+import com.silentpdf.app.ui.screens.ReaderScreen
+import com.silentpdf.app.ui.screens.PinLockScreen
+import com.silentpdf.app.ui.theme.MyApplicationTheme
+import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,4 +1,4 @@
-package com.example.util
+package com.silentpdf.app.util
 
 import android.content.Context
 import android.graphics.Bitmap

@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.silentpdf.app.ui.screens
 
 import android.content.Context
 import android.print.PrintAttributes
@@ -62,11 +62,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.viewmodel.DrawingStroke
-import com.example.ui.viewmodel.SilentPdfViewModel
+import com.silentpdf.app.ui.viewmodel.DrawingStroke
+import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
 import kotlinx.coroutines.launch
 
-fun printPdf(context: Context, pdf: com.example.data.db.PdfEntity) {
+fun printPdf(context: Context, pdf: com.silentpdf.app.data.db.PdfEntity) {
     val printManager = context.getSystemService(Context.PRINT_SERVICE) as PrintManager
     try {
         val printAdapter = object : PrintDocumentAdapter() {

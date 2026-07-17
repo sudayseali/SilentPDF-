@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.silentpdf.app.ui.screens
 
 import android.content.Context
 import android.content.Intent
@@ -38,8 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
-import com.example.data.db.PdfEntity
-import com.example.ui.viewmodel.SilentPdfViewModel
+import com.silentpdf.app.data.db.PdfEntity
+import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
 
 fun sharePdf(context: Context, pdf: PdfEntity) {
     try {
@@ -128,7 +128,7 @@ fun BookCover(
     
     LaunchedEffect(uriString) {
         if (uriString != null) {
-            thumbnailFile = com.example.util.PdfThumbnailHelper.getThumbnail(context, uriString)
+            thumbnailFile = com.silentpdf.app.util.PdfThumbnailHelper.getThumbnail(context, uriString)
         }
     }
 

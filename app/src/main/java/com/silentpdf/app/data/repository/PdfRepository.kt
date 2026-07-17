@@ -1,12 +1,12 @@
-package com.example.data.repository
+package com.silentpdf.app.data.repository
 
 import android.content.ContentUris
 import android.content.Context
 import android.provider.MediaStore
 import android.util.Log
-import com.example.data.db.BookmarkEntity
-import com.example.data.db.PdfEntity
-import com.example.data.db.SilentPdfDao
+import com.silentpdf.app.data.db.BookmarkEntity
+import com.silentpdf.app.data.db.PdfEntity
+import com.silentpdf.app.data.db.SilentPdfDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
@@ -85,11 +85,11 @@ class PdfRepository(
     }
 
     // Notes operations
-    fun getNotesForPdf(pdfUriString: String): Flow<List<com.example.data.db.NoteEntity>> {
+    fun getNotesForPdf(pdfUriString: String): Flow<List<com.silentpdf.app.data.db.NoteEntity>> {
         return pdfDao.getNotesForPdf(pdfUriString)
     }
 
-    suspend fun getNoteForPage(pdfUriString: String, pageNumber: Int): com.example.data.db.NoteEntity? = withContext(Dispatchers.IO) {
+    suspend fun getNoteForPage(pdfUriString: String, pageNumber: Int): com.silentpdf.app.data.db.NoteEntity? = withContext(Dispatchers.IO) {
         pdfDao.getNoteForPage(pdfUriString, pageNumber)
     }
 
@@ -98,7 +98,7 @@ class PdfRepository(
         if (existing != null) {
             pdfDao.insertNote(existing.copy(noteText = noteText, timestamp = System.currentTimeMillis()))
         } else {
-            pdfDao.insertNote(com.example.data.db.NoteEntity(
+            pdfDao.insertNote(com.silentpdf.app.data.db.NoteEntity(
                 pdfUriString = pdfUriString,
                 pageNumber = pageNumber,
                 noteText = noteText

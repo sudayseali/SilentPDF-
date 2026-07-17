@@ -1,4 +1,4 @@
-package com.example.ui.viewmodel
+package com.silentpdf.app.ui.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
@@ -8,15 +8,16 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.db.BookmarkEntity
-import com.example.data.db.PdfEntity
-import com.example.data.db.SilentPdfDatabase
-import com.example.data.repository.PdfRenderEngine
-import com.example.data.repository.PdfRepository
-import com.example.data.repository.PdfTextSearcher
+import com.silentpdf.app.data.db.BookmarkEntity
+import com.silentpdf.app.data.db.PdfEntity
+import com.silentpdf.app.data.db.SilentPdfDatabase
+import com.silentpdf.app.data.repository.PdfRenderEngine
+import com.silentpdf.app.data.repository.PdfRepository
+import com.silentpdf.app.data.repository.PdfTextSearcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 
 data class DrawingStroke(
     val points: List<Offset>,
@@ -188,7 +189,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val currentNotes: StateFlow<List<com.example.data.db.NoteEntity>> = _currentPdf
+    val currentNotes: StateFlow<List<com.silentpdf.app.data.db.NoteEntity>> = _currentPdf
         .flatMapLatest { pdf ->
             pdf?.let { repository.getNotesForPdf(it.uriString) } ?: flowOf(emptyList())
         }
@@ -480,7 +481,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun closePdf() {
         _currentPageBitmap.value = null
-        renderEngine.closeDocument()
+        viewModelScope.launch(Dispatchers.IO) {
+            renderEngine.closeDocument()
+        }
         _currentPdf.value = null
         _pageCount.value = 0
         _currentPage.value = 0
@@ -603,6 +606,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() {
         super.onCleared()
+        // Run synchronously to ensure it closes before the process dies
         renderEngine.closeDocument()
         try {
             mediaRecorder?.release()
