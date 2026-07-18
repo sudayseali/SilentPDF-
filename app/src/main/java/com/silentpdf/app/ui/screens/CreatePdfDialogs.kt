@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +33,8 @@ fun CreateOptionsSheet(
     onDismiss: () -> Unit,
     onImportPdf: () -> Unit,
     onImagesToPdfClick: () -> Unit,
-    onTextToPdfClick: () -> Unit
+    onTextToPdfClick: () -> Unit,
+    onScanToPdfClick: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,11 +66,23 @@ fun CreateOptionsSheet(
             )
             
             ListItem(
-                headlineContent = { Text("Scan / Images to PDF", fontWeight = FontWeight.Medium) },
+                headlineContent = { Text("Scan with Camera", fontWeight = FontWeight.Medium) },
+                supportingContent = { Text("Take photos to create a new PDF") },
+                leadingContent = { 
+                    Box(modifier = Modifier.size(48.dp).background(Color(0xFFE91E63).copy(alpha=0.1f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Outlined.CameraAlt, null, tint = Color(0xFFE91E63)) 
+                    }
+                },
+                modifier = Modifier.clickable { onDismiss(); onScanToPdfClick() },
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
+            
+            ListItem(
+                headlineContent = { Text("Gallery Images to PDF", fontWeight = FontWeight.Medium) },
                 supportingContent = { Text("Select photos to combine into a PDF") },
                 leadingContent = { 
                     Box(modifier = Modifier.size(48.dp).background(Color(0xFF00C853).copy(alpha=0.1f), RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Outlined.CameraAlt, null, tint = Color(0xFF00C853)) 
+                        Icon(Icons.Outlined.PhotoLibrary, null, tint = Color(0xFF00C853)) 
                     }
                 },
                 modifier = Modifier.clickable { onDismiss(); onImagesToPdfClick() },

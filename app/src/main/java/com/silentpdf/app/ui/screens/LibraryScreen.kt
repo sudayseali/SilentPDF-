@@ -828,6 +828,7 @@ fun EmptyState(
 fun LibraryScreen(
     viewModel: SilentPdfViewModel,
     onNavigateToReader: () -> Unit,
+    onNavigateToCamera: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -972,6 +973,19 @@ fun LibraryScreen(
                     )
                 )
                 NavigationBarItem(
+                    selected = selectedTab == 3,
+                    onClick = { viewModel.setSelectedTab(3); viewModel.setSelectedCategory(null) },
+                    icon = { Icon(Icons.Outlined.Build, contentDescription = null) },
+                    label = { Text("Tools", fontWeight = FontWeight.Bold) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF2F80ED),
+                        selectedTextColor = Color(0xFF2F80ED),
+                        indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                )
+                NavigationBarItem(
                     selected = showSettingsSheet,
                     onClick = { showSettingsSheet = true },
                     icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
@@ -987,14 +1001,16 @@ fun LibraryScreen(
             }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { showCreateSheet = true },
-                containerColor = Color(0xFF2F80ED),
-                contentColor = Color.White,
-                shape = CircleShape,
-                icon = { Icon(Icons.Default.Add, "Create PDF", modifier = Modifier.size(24.dp)) },
-                text = { Text("Add", fontWeight = FontWeight.Black) }
-            )
+            if (selectedTab != 3) {
+                ExtendedFloatingActionButton(
+                    onClick = { showCreateSheet = true },
+                    containerColor = Color(0xFF2F80ED),
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    icon = { Icon(Icons.Default.Add, "Create PDF", modifier = Modifier.size(24.dp)) },
+                    text = { Text("Add", fontWeight = FontWeight.Black) }
+                )
+            }
         }
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -1022,12 +1038,24 @@ fun LibraryScreen(
                     )
                 }
             }
-            LazyColumn(
-                modifier = modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentPadding = PaddingValues(bottom = 32.dp)
-            ) {
+            if (selectedTab == 3) {
+                ToolsScreenContent(
+                    paddingValues = paddingValues,
+                    onNavigateToCamera = onNavigateToCamera,
+                    imagePickerLauncher = imagePickerLauncher,
+                    filePickerLauncher = filePickerLauncher,
+                    showTextToPdfDialog = { showTextToPdfDialog = true },
+                    showCreateFolderDialog = { showCreateFolderDialog = true },
+                    viewModel = viewModel,
+                    onNavigateToReader = onNavigateToReader
+                )
+            } else {
+                LazyColumn(
+                    modifier = modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentPadding = PaddingValues(bottom = 32.dp)
+                ) {
             // 1. Premium Top Bar Branded
             item {
                 Row(
@@ -1501,6 +1529,7 @@ fun LibraryScreen(
                 }
             }
         }
+        } // Close the else block
         } // Close the Box wrapping LazyColumn
     }
 
@@ -1510,7 +1539,8 @@ fun LibraryScreen(
             onDismiss = { showCreateSheet = false },
             onImportPdf = { filePickerLauncher.launch(arrayOf("application/pdf")) },
             onImagesToPdfClick = { imagePickerLauncher.launch("image/*") },
-            onTextToPdfClick = { showTextToPdfDialog = true }
+            onTextToPdfClick = { showTextToPdfDialog = true },
+            onScanToPdfClick = { onNavigateToCamera() }
         )
     }
 

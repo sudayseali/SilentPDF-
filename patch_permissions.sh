@@ -1,0 +1,4 @@
+#!/bin/bash
+perl -0777 -pi -e 's/val permissions = mutableListOf\(\n        android\.Manifest\.permission\.CAMERA\n    \)\n    if \(Build\.VERSION\.SDK_INT \<\= Build\.VERSION_CODES\.TIRAMISU\) \{\n        permissions\.add\(android\.Manifest\.permission\.READ_EXTERNAL_STORAGE\)\n    \}/val permissions = listOf(\n        android.Manifest.permission.CAMERA,\n        android.Manifest.permission.READ_EXTERNAL_STORAGE\n    )/g' app/src/main/java/com/silentpdf/app/MainActivity.kt
+
+perl -0777 -pi -e 's/val permissions = mutableListOf\(\n        android\.Manifest\.permission\.CAMERA\n    \)\n    if \(Build\.VERSION\.SDK_INT \<\= Build\.VERSION_CODES\.TIRAMISU\) \{\n        permissions\.add\(android\.Manifest\.permission\.READ_EXTERNAL_STORAGE\)\n    \}/val permissions = listOf(\n        android.Manifest.permission.CAMERA,\n        android.Manifest.permission.READ_EXTERNAL_STORAGE\n    )/g' app/src/main/java/com/silentpdf/app/ui/screens/OnboardingScreen.kt

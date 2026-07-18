@@ -15,9 +15,15 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.silentpdf.app.ui.screens.CameraScanScreen
 import com.silentpdf.app.ui.screens.LibraryScreen
 import com.silentpdf.app.ui.screens.ReaderScreen
 import com.silentpdf.app.ui.screens.PinLockScreen
+import com.silentpdf.app.ui.screens.OnboardingScreen
+import android.os.Build
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import androidx.compose.runtime.LaunchedEffect
 import com.silentpdf.app.ui.theme.MyApplicationTheme
 import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
 
@@ -35,8 +41,14 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun SilentPdfApp(viewModel: SilentPdfViewModel = viewModel()) {
+    val permissions = listOf(
+        android.Manifest.permission.CAMERA
+    )
+    val permissionState = rememberMultiplePermissionsState(permissions)
+    val startDest = if (permissionState.allPermissionsGranted) "library" else "onboarding"
     val navController = rememberNavController()
     val isAppLocked by viewModel.isAppLocked.collectAsState()
 
@@ -48,17 +60,34 @@ fun SilentPdfApp(viewModel: SilentPdfViewModel = viewModel()) {
         ) { innerPadding ->
             NavHost(
                 navController = navController,
-                startDestination = "library",
+                startDestination = startDest,
                 modifier = Modifier.padding(innerPadding)
             ) {
+                composable("onboarding") {
+                    OnboardingScreen(
+                        viewModel = viewModel,
+                        onNavigateToLibrary = {
+                            navController.navigate("library") {
+                                popUpTo("onboarding") { inclusive = true }
+                            }
+                        }
+                    )
+                }
                 composable("library") {
                     LibraryScreen(
                         viewModel = viewModel,
-                        onNavigateToReader = { navController.navigate("reader") }
+                        onNavigateToReader = { navController.navigate("reader") },
+                        onNavigateToCamera = { navController.navigate("camera_scan") }
                     )
                 }
                 composable("reader") {
                     ReaderScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { navController.navigateUp() }
+                    )
+                }
+                composable("camera_scan") {
+                    CameraScanScreen(
                         viewModel = viewModel,
                         onNavigateBack = { navController.navigateUp() }
                     )
