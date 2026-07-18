@@ -1,6 +1,10 @@
 package com.silentpdf.app.ui.screens
 
 import android.content.Context
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -845,7 +849,21 @@ fun LibraryScreen(
     val isPinConfigured by viewModel.isPinConfigured.collectAsState()
     var showSecurityDialog by remember { mutableStateOf(false) }
     var showSupportDialog by remember { mutableStateOf(false) }
-    var showSettingsSheet by remember { mutableStateOf(false) }
+        var showSettingsSheet by remember { mutableStateOf(false) }
+    var showCreateSheet by remember { mutableStateOf(false) }
+    var showTextToPdfDialog by remember { mutableStateOf(false) }
+    var showImagesToPdfDialog by remember { mutableStateOf(false) }
+    var selectedImagesForPdf by remember { mutableStateOf<List<android.net.Uri>>(emptyList()) }
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents(),
+        onResult = { uris ->
+            if (uris.isNotEmpty()) {
+                selectedImagesForPdf = uris
+                showImagesToPdfDialog = true
+            }
+        }
+    )
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -970,12 +988,12 @@ fun LibraryScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { filePickerLauncher.launch(arrayOf("application/pdf")) },
+                onClick = { showCreateSheet = true },
                 containerColor = Color(0xFF2F80ED),
                 contentColor = Color.White,
                 shape = CircleShape,
-                icon = { Icon(Icons.Default.Add, "Import PDF", modifier = Modifier.size(24.dp)) },
-                text = { Text("Import PDF", fontWeight = FontWeight.Black) }
+                icon = { Icon(Icons.Default.Add, "Create PDF", modifier = Modifier.size(24.dp)) },
+                text = { Text("Add", fontWeight = FontWeight.Black) }
             )
         }
     ) { paddingValues ->
@@ -1487,6 +1505,36 @@ fun LibraryScreen(
     }
 
     // Settings Modal Bottom Sheet
+    if (showCreateSheet) {
+        CreateOptionsSheet(
+            onDismiss = { showCreateSheet = false },
+            onImportPdf = { filePickerLauncher.launch(arrayOf("application/pdf")) },
+            onImagesToPdfClick = { imagePickerLauncher.launch("image/*") },
+            onTextToPdfClick = { showTextToPdfDialog = true }
+        )
+    }
+
+    if (showImagesToPdfDialog) {
+        ImagesToPdfDialog(
+            imageUris = selectedImagesForPdf,
+            onDismiss = { showImagesToPdfDialog = false },
+            onPdfCreated = { uri ->
+                val file = java.io.File(uri.path!!)
+                viewModel.importPdf(uri, file.name, file.length())
+            }
+        )
+    }
+
+    if (showTextToPdfDialog) {
+        TextToPdfDialog(
+            onDismiss = { showTextToPdfDialog = false },
+            onPdfCreated = { uri ->
+                val file = java.io.File(uri.path!!)
+                viewModel.importPdf(uri, file.name, file.length())
+            }
+        )
+    }
+
     if (showSettingsSheet) {
         ModalBottomSheet(
             onDismissRequest = { showSettingsSheet = false },
