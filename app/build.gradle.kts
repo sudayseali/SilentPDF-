@@ -78,6 +78,9 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
+    // PDFBox for Android
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    
     // Accompanist for Permissions
     implementation(libs.accompanist.permissions)
 

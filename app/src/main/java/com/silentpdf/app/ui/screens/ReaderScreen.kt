@@ -130,6 +130,12 @@ fun ReaderScreen(
         handleExit()
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.closePdf()
+        }
+    }
+
     val currentPdf by viewModel.currentPdf.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
     val currentPage by viewModel.currentPage.collectAsState()

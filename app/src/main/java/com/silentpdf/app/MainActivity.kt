@@ -26,10 +26,12 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import androidx.compose.runtime.LaunchedEffect
 import com.silentpdf.app.ui.theme.MyApplicationTheme
 import com.silentpdf.app.ui.viewmodel.SilentPdfViewModel
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PDFBoxResourceLoader.init(applicationContext)
         enableEdgeToEdge()
         setContent {
             val viewModel: SilentPdfViewModel = viewModel()
@@ -45,10 +47,16 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SilentPdfApp(viewModel: SilentPdfViewModel = viewModel()) {
     val permissions = listOf(
-        android.Manifest.permission.CAMERA
+        android.Manifest.permission.READ_EXTERNAL_STORAGE,
+        android.Manifest.permission.WRITE_EXTERNAL_STORAGE
     )
     val permissionState = rememberMultiplePermissionsState(permissions)
-    val startDest = if (permissionState.allPermissionsGranted) "library" else "onboarding"
+    val allGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        android.os.Environment.isExternalStorageManager()
+    } else {
+        permissionState.allPermissionsGranted
+    }
+    val startDest = if (allGranted) "library" else "onboarding"
     val navController = rememberNavController()
     val isAppLocked by viewModel.isAppLocked.collectAsState()
 

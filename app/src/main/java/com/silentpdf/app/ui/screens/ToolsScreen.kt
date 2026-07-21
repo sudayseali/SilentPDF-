@@ -15,6 +15,16 @@ import android.print.PrintAttributes
 import android.print.PrintManager
 import android.util.Log
 import android.widget.Toast
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
+import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
+import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
+import com.tom_roush.pdfbox.multipdf.Splitter
+import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import com.tom_roush.pdfbox.pdmodel.graphics.image.JPEGFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.*
@@ -59,6 +69,7 @@ import com.silentpdf.app.util.PdfCreator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.FileInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -275,56 +286,23 @@ fun ToolsScreenContent(
         )
     }
 
-    if (showEditTextDialog && selectedPdfForTool != null) {
-        EditTextDialog(
+    if ((showEditTextDialog || showAddTextDialog) && selectedPdfForTool != null) {
+        VisualEditorScreen(
             pdf = selectedPdfForTool!!,
+            initialTool = if (showEditTextDialog) ActiveTool.EditText else ActiveTool.AddText,
             onDismiss = {
                 showEditTextDialog = false
-                selectedPdfForTool = null
-                activeTool = ActiveTool.None
-            },
-            onSave = { updatedText, title ->
-                showEditTextDialog = false
-                val pdf = selectedPdfForTool!!
-                selectedPdfForTool = null
-                activeTool = ActiveTool.None
-                scope.launch {
-                    val uri = PdfCreator.createTextPdf(context, updatedText, title)
-                    if (uri != null) {
-                        val file = File(uri.path!!)
-                        viewModel.importPdf(uri, file.name, file.length())
-                        Toast.makeText(context, "PDF generated successfully!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "Failed to update PDF text", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-        )
-    }
-
-    if (showAddTextDialog && selectedPdfForTool != null) {
-        AddTextDialog(
-            pdf = selectedPdfForTool!!,
-            onDismiss = {
                 showAddTextDialog = false
                 selectedPdfForTool = null
                 activeTool = ActiveTool.None
             },
-            onSave = { textToAppend ->
+            onSaveSuccess = { uri, file ->
+                showEditTextDialog = false
                 showAddTextDialog = false
-                val pdf = selectedPdfForTool!!
                 selectedPdfForTool = null
                 activeTool = ActiveTool.None
-                scope.launch {
-                    val uri = appendTextToPdf(context, pdf, textToAppend)
-                    if (uri != null) {
-                        val file = File(uri.path!!)
-                        viewModel.importPdf(uri, file.name, file.length())
-                        Toast.makeText(context, "Text added successfully!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(context, "Failed to add text", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                viewModel.importPdf(uri, file.name, file.length())
+                Toast.makeText(context, "PDF saved successfully!", Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -495,6 +473,54 @@ fun ToolsScreenContent(
             color = MaterialTheme.colorScheme.onBackground,
             modifier = Modifier.padding(vertical = 12.dp)
         )
+        
+        // Premium Hero Banner
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.Transparent
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                Color(0xFF2F80ED),
+                                Color(0xFF90CAF9)
+                            )
+                        )
+                    )
+                    .padding(24.dp)
+            ) {
+                Column {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Pro Tools",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Unlock Your\nProductivity",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Everything you need to edit, convert and manage your PDFs in one place.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+                }
+            }
+        }
 
         // Convert Section
         ToolCategorySection(
@@ -516,7 +542,7 @@ fun ToolsScreenContent(
             tools = listOf(
                 ToolItemData("Edit text", Icons.Outlined.TextFormat, Color(0xFF3F51B5), { onToolClick(ActiveTool.EditText) }),
                 ToolItemData("Add text", Icons.Outlined.TextFields, Color(0xFF00BCD4), { onToolClick(ActiveTool.AddText) }),
-                ToolItemData("Annotate", Icons.Outlined.Edit, Color(0xFFFF5722), { onToolClick(ActiveTool.Print) }), // Print/Share to PDF with annotation
+                ToolItemData("Annotate", Icons.Outlined.Edit, Color(0xFFFF5722), { onToolClick(ActiveTool.AddText) }),
                 ToolItemData("Sign", Icons.Outlined.BorderColor, Color(0xFF9C27B0), { onToolClick(ActiveTool.Sign) })
             )
         )
@@ -565,65 +591,77 @@ fun ToolCategorySection(
     title: String,
     tools: List<ToolItemData>
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-            modifier = Modifier.padding(vertical = 8.dp)
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 4.dp)
         )
 
-        // Clean 4-column layout as in screenshot
-        val rows = tools.chunked(4)
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Modern 2-column card layout
+        val rows = tools.chunked(2)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             rows.forEach { rowTools ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Start
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     rowTools.forEach { tool ->
-                        Box(
+                        Card(
                             modifier = Modifier
                                 .weight(1f)
+                                .height(88.dp)
                                 .clickable { tool.onClick() },
-                            contentAlignment = Alignment.Center
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(4.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(56.dp)
-                                        .background(tool.color.copy(alpha = 0.12f), CircleShape)
-                                        .border(0.5.dp, tool.color.copy(alpha = 0.2f), CircleShape),
+                                        .size(48.dp)
+                                        .background(
+                                            Brush.linearGradient(
+                                                colors = listOf(
+                                                    tool.color.copy(alpha = 0.2f),
+                                                    tool.color.copy(alpha = 0.05f)
+                                                )
+                                            ),
+                                            CircleShape
+                                        ),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = tool.icon,
                                         contentDescription = tool.title,
                                         tint = tool.color,
-                                        modifier = Modifier.size(26.dp)
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = tool.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    textAlign = TextAlign.Center,
+                                    lineHeight = 18.sp,
                                     maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    lineHeight = 13.sp
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
                     }
                     // Padding if row is incomplete
-                    for (i in rowTools.size until 4) {
+                    for (i in rowTools.size until 2) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
@@ -988,124 +1026,6 @@ fun BurnSignatureDialog(
             ) {
                 if (isGenerating) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
                 else Text("Apply Signature")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun EditTextDialog(
-    pdf: PdfEntity,
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var title by remember { mutableStateOf("${pdf.fileName.substringBeforeLast(".")}_Edited") }
-    var contentText by remember { mutableStateOf("Loading text from document...") }
-    val context = LocalContext.current
-
-    LaunchedEffect(pdf) {
-        withContext(Dispatchers.IO) {
-            try {
-                // Read text pages if cached, or do a simple dump
-                // Since this is client-side, let's pre-populate with some clean editable template if text parsing fails
-                contentText = "This is the editable text extracted from your document '${pdf.fileName}'.\n\nYou can edit or replace this content completely and export as a brand new, clean PDF!\n\n---\n"
-            } catch (e: Exception) {
-                contentText = "Failed to load document text. Write custom content here."
-            }
-        }
-    }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Close")
-                    }
-                    Text("Edit Text to PDF", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                    Button(
-                        onClick = { onSave(contentText, title) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F80ED))
-                    ) {
-                        Text("Export", color = Color.White)
-                    }
-                }
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 20.dp)
-                ) {
-                    OutlinedTextField(
-                        value = title,
-                        onValueChange = { title = it },
-                        label = { Text("New Document Title") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    OutlinedTextField(
-                        value = contentText,
-                        onValueChange = { contentText = it },
-                        label = { Text("Document Content Text") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(bottom = 24.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun AddTextDialog(
-    pdf: PdfEntity,
-    onDismiss: () -> Unit,
-    onSave: (String) -> Unit
-) {
-    var textToAppend by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Append Page to PDF", fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                Text("Write text that will be appended as a new page at the end of '${pdf.fileName}'.")
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = textToAppend,
-                    onValueChange = { textToAppend = it },
-                    label = { Text("Text content...") },
-                    modifier = Modifier.fillMaxWidth().height(150.dp)
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onSave(textToAppend) },
-                enabled = textToAppend.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F80ED))
-            ) {
-                Text("Append", color = Color.White)
             }
         },
         dismissButton = {
@@ -1488,34 +1408,16 @@ suspend fun convertPdfToLongImage(context: Context, pdf: PdfEntity): Boolean = w
 
 suspend fun mergePdfs(context: Context, pdfs: List<PdfEntity>): Uri? = withContext(Dispatchers.IO) {
     try {
-        val document = PdfDocument()
-        var totalPageCount = 1
+        val merger = PDFMergerUtility()
+        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "Merged_Document_${System.currentTimeMillis()}.pdf")
+        merger.destinationFileName = file.absolutePath
 
         pdfs.forEach { pdf ->
             val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@forEach
-            val renderer = PdfRenderer(pfd)
-            for (i in 0 until renderer.pageCount) {
-                val page = renderer.openPage(i)
-                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, totalPageCount).create()
-                val pdfPage = document.startPage(pageInfo)
-                val canvas = pdfPage.canvas
-                canvas.drawBitmap(bitmap, 0f, 0f, Paint())
-                document.finishPage(pdfPage)
-
-                bitmap.recycle()
-                page.close()
-                totalPageCount++
-            }
-            renderer.close()
-            pfd.close()
+            merger.addSource(FileInputStream(pfd.fileDescriptor))
         }
 
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "Merged_Document_${System.currentTimeMillis()}.pdf")
-        document.writeTo(FileOutputStream(file))
-        document.close()
+        merger.mergeDocuments(com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
         return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1527,47 +1429,37 @@ suspend fun splitPdf(context: Context, pdf: PdfEntity, rangeStr: String): List<U
     val results = mutableListOf<Uri>()
     try {
         val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext emptyList()
-        val renderer = PdfRenderer(pfd)
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
 
         // Parse ranges, e.g. "1-3" or "2"
         val pagesToExtract = mutableListOf<Int>()
         if (rangeStr.contains("-")) {
             val parts = rangeStr.split("-")
             val start = parts[0].trim().toIntOrNull() ?: 1
-            val end = parts[1].trim().toIntOrNull() ?: renderer.pageCount
+            val end = parts[1].trim().toIntOrNull() ?: document.numberOfPages
             for (p in start..end) {
-                if (p in 1..renderer.pageCount) pagesToExtract.add(p)
+                if (p in 1..document.numberOfPages) pagesToExtract.add(p)
             }
         } else {
             rangeStr.split(",").forEach { item ->
                 val p = item.trim().toIntOrNull()
-                if (p != null && p in 1..renderer.pageCount) pagesToExtract.add(p)
+                if (p != null && p in 1..document.numberOfPages) pagesToExtract.add(p)
             }
         }
 
         if (pagesToExtract.isNotEmpty()) {
-            val document = PdfDocument()
-            pagesToExtract.forEachIndexed { index, pageNum ->
-                val page = renderer.openPage(pageNum - 1)
-                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, index + 1).create()
-                val pdfPage = document.startPage(pageInfo)
-                val canvas = pdfPage.canvas
-                canvas.drawBitmap(bitmap, 0f, 0f, Paint())
-                document.finishPage(pdfPage)
-
-                bitmap.recycle()
-                page.close()
+            val newDocument = PDDocument()
+            pagesToExtract.forEach { pageNum ->
+                val page = document.getPage(pageNum - 1)
+                newDocument.addPage(page)
             }
             val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.substringBeforeLast(".")}_split_${System.currentTimeMillis()}.pdf")
-            document.writeTo(FileOutputStream(file))
-            document.close()
+            newDocument.save(file)
+            newDocument.close()
             results.add(Uri.fromFile(file))
         }
 
-        renderer.close()
+        document.close()
         pfd.close()
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1578,31 +1470,25 @@ suspend fun splitPdf(context: Context, pdf: PdfEntity, rangeStr: String): List<U
 suspend fun keepPdfPages(context: Context, pdf: PdfEntity, keptPages: List<Int>): Uri? = withContext(Dispatchers.IO) {
     try {
         val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext null
-        val renderer = PdfRenderer(pfd)
-        val document = PdfDocument()
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
 
-        keptPages.forEachIndexed { index, pageNum ->
-            if (pageNum in 1..renderer.pageCount) {
-                val page = renderer.openPage(pageNum - 1)
-                val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, index + 1).create()
-                val pdfPage = document.startPage(pageInfo)
-                val canvas = pdfPage.canvas
-                canvas.drawBitmap(bitmap, 0f, 0f, Paint())
-                document.finishPage(pdfPage)
-
-                bitmap.recycle()
-                page.close()
+        // We must remove pages from the end to the beginning to not mess up indexes
+        val pagesToRemove = mutableListOf<Int>()
+        for (i in 1..document.numberOfPages) {
+            if (!keptPages.contains(i)) {
+                pagesToRemove.add(i - 1)
             }
         }
-        renderer.close()
-        pfd.close()
+        
+        pagesToRemove.sortedDescending().forEach { pageIndex ->
+            document.removePage(pageIndex)
+        }
 
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.substringBeforeLast(".")}_rearranged_${System.currentTimeMillis()}.pdf")
-        document.writeTo(FileOutputStream(file))
+        document.save(file)
         document.close()
+        pfd.close()
+
         return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1650,42 +1536,32 @@ suspend fun compressPdf(context: Context, pdf: PdfEntity, quality: Int): Uri? = 
 suspend fun appendTextToPdf(context: Context, pdf: PdfEntity, textToAppend: String): Uri? = withContext(Dispatchers.IO) {
     try {
         val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext null
-        val renderer = PdfRenderer(pfd)
-        val document = PdfDocument()
-
-        // Copy existing pages
-        for (i in 0 until renderer.pageCount) {
-            val page = renderer.openPage(i)
-            val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-            val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, i + 1).create()
-            val pdfPage = document.startPage(pageInfo)
-            val canvas = pdfPage.canvas
-            canvas.drawBitmap(bitmap, 0f, 0f, Paint())
-            document.finishPage(pdfPage)
-
-            bitmap.recycle()
-            page.close()
-        }
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
 
         // Add the new text page
-        val newPageInfo = PdfDocument.PageInfo.Builder(595, 842, renderer.pageCount + 1).create() // A4
-        val newPage = document.startPage(newPageInfo)
-        val canvas = newPage.canvas
-        val paint = Paint().apply {
-            color = android.graphics.Color.BLACK
-            textSize = 14f
+        val newPage = PDPage()
+        document.addPage(newPage)
+        val contentStream = PDPageContentStream(document, newPage)
+        
+        contentStream.beginText()
+        contentStream.setFont(PDType1Font.HELVETICA, 12f)
+        contentStream.newLineAtOffset(50f, 700f)
+        
+        // Handle newlines simply by splitting
+        val lines = textToAppend.split("\n")
+        for (line in lines) {
+            contentStream.showText(line)
+            contentStream.newLineAtOffset(0f, -15f)
         }
-        canvas.drawText(textToAppend, 50f, 80f, paint)
-        document.finishPage(newPage)
-
-        renderer.close()
-        pfd.close()
+        
+        contentStream.endText()
+        contentStream.close()
 
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.substringBeforeLast(".")}_appended_${System.currentTimeMillis()}.pdf")
-        document.writeTo(FileOutputStream(file))
+        document.save(file)
         document.close()
+        pfd.close()
+
         return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1694,18 +1570,20 @@ suspend fun appendTextToPdf(context: Context, pdf: PdfEntity, textToAppend: Stri
 }
 
 suspend fun lockPdf(context: Context, pdf: PdfEntity, pin: String): Uri? = withContext(Dispatchers.IO) {
-    // Standard secure password protection is simulated by local custom encryption header in the file metadata
-    // This allows keeping full compatibility offline and on non-Oreo+ platforms.
     try {
-        val inputStream = context.contentResolver.openInputStream(Uri.parse(pdf.uriString))
+        val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext null
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
+
+        val accessPermission = AccessPermission()
+        val spp = StandardProtectionPolicy(pin, pin, accessPermission)
+        spp.encryptionKeyLength = 128
+        document.protect(spp)
+
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.substringBeforeLast(".")}_locked_${System.currentTimeMillis()}.pdf")
-        val outputStream = FileOutputStream(file)
-        
-        // Write the custom encryption header prefix
-        outputStream.write("SILENTPDF_LOCKED:$pin\n".toByteArray())
-        inputStream?.copyTo(outputStream)
-        inputStream?.close()
-        outputStream.close()
+        document.save(file)
+        document.close()
+        pfd.close()
+
         return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()
@@ -1715,24 +1593,17 @@ suspend fun lockPdf(context: Context, pdf: PdfEntity, pin: String): Uri? = withC
 
 suspend fun unlockPdf(context: Context, pdf: PdfEntity, pin: String): Uri? = withContext(Dispatchers.IO) {
     try {
-        val inputStream = context.contentResolver.openInputStream(Uri.parse(pdf.uriString)) ?: return@withContext null
-        val reader = inputStream.bufferedReader()
-        val header = reader.readLine() ?: ""
+        val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext null
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), pin, com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
         
-        if (header.startsWith("SILENTPDF_LOCKED:$pin")) {
-            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.replace("_locked_", "_unlocked_")}")
-            val outputStream = FileOutputStream(file)
-            
-            // Read remaining stream and write to new file
-            val remainingBytes = inputStream.readBytes()
-            outputStream.write(remainingBytes)
-            outputStream.close()
-            inputStream.close()
-            return@withContext Uri.fromFile(file)
-        } else {
-            inputStream.close()
-            return@withContext null
-        }
+        document.isAllSecurityToBeRemoved = true
+
+        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.replace("_locked_", "_unlocked_")}")
+        document.save(file)
+        document.close()
+        pfd.close()
+
+        return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()
         return@withContext null
@@ -1742,38 +1613,29 @@ suspend fun unlockPdf(context: Context, pdf: PdfEntity, pin: String): Uri? = wit
 suspend fun burnSignatureToPdf(context: Context, pdf: PdfEntity, signature: Bitmap, pageNum: Int): Uri? = withContext(Dispatchers.IO) {
     try {
         val pfd = context.contentResolver.openFileDescriptor(Uri.parse(pdf.uriString), "r") ?: return@withContext null
-        val renderer = PdfRenderer(pfd)
-        val document = PdfDocument()
+        val document = PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly())
 
-        for (i in 0 until renderer.pageCount) {
-            val page = renderer.openPage(i)
-            val bitmap = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-            page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-            val pageInfo = PdfDocument.PageInfo.Builder(page.width, page.height, i + 1).create()
-            val pdfPage = document.startPage(pageInfo)
-            val canvas = pdfPage.canvas
-            canvas.drawBitmap(bitmap, 0f, 0f, Paint())
-
-            // Burn signature if it's the requested page
-            if (i == pageNum - 1) {
-                // Scale signature to fit bottom right
-                val sigWidth = page.width / 4
-                val sigHeight = sigWidth / 2
-                val scaledSig = Bitmap.createScaledBitmap(signature, sigWidth, sigHeight, true)
-                canvas.drawBitmap(scaledSig, (page.width - sigWidth - 40).toFloat(), (page.height - sigHeight - 40).toFloat(), Paint())
-            }
-
-            document.finishPage(pdfPage)
-            bitmap.recycle()
-            page.close()
+        if (pageNum in 1..document.numberOfPages) {
+            val page = document.getPage(pageNum - 1)
+            val pdImage = LosslessFactory.createFromImage(document, signature)
+            val contentStream = PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true)
+            
+            // Draw signature near bottom right. Scaling down the bitmap to fit.
+            val scale = 0.5f
+            val imageWidth = pdImage.width * scale
+            val imageHeight = pdImage.height * scale
+            val startX = page.mediaBox.width - imageWidth - 50f
+            val startY = 50f
+            
+            contentStream.drawImage(pdImage, startX, startY, imageWidth, imageHeight)
+            contentStream.close()
         }
-        renderer.close()
-        pfd.close()
 
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${pdf.fileName.substringBeforeLast(".")}_signed_${System.currentTimeMillis()}.pdf")
-        document.writeTo(FileOutputStream(file))
+        document.save(file)
         document.close()
+        pfd.close()
+
         return@withContext Uri.fromFile(file)
     } catch (e: Exception) {
         e.printStackTrace()

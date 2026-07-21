@@ -460,9 +460,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 // Dynamically fetch outline/table of contents on a background thread
                 extractPdfOutline()
                 
-                // Cache plain text pages for AI capabilities
-                cachePdfText(Uri.parse(pdf.uriString))
-
+                // Cache plain text pages for AI capabilities deferred to prevent OOM
             } catch (e: SecurityException) {
                 Log.e("SilentPdfViewModel", "Encrypted PDF file requiring password", e)
                 _isPasswordProtected.value = true
@@ -481,9 +479,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun closePdf() {
         _currentPageBitmap.value = null
-        viewModelScope.launch(Dispatchers.IO) {
-            renderEngine.closeDocument()
-        }
+        renderEngine.closeDocument()
+        com.silentpdf.app.util.ViewRecycler.clearMemory()
         _currentPdf.value = null
         _pageCount.value = 0
         _currentPage.value = 0
