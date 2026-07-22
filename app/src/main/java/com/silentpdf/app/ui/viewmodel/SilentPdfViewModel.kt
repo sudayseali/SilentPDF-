@@ -81,6 +81,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isTrueDarkMode = MutableStateFlow(viewSettingsPrefs.getBoolean("true_dark_mode", false))
     val isTrueDarkMode: StateFlow<Boolean> = _isTrueDarkMode
 
+    private val _isAppDarkMode = MutableStateFlow(viewSettingsPrefs.getBoolean("app_dark_mode", false))
+    val isAppDarkMode: StateFlow<Boolean> = _isAppDarkMode
+
     private val _isGridView = MutableStateFlow(viewSettingsPrefs.getBoolean("grid_view", false))
     val isGridView: StateFlow<Boolean> = _isGridView
 
@@ -397,6 +400,12 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         val newValue = !_isTrueDarkMode.value
         _isTrueDarkMode.value = newValue
         viewSettingsPrefs.edit().putBoolean("true_dark_mode", newValue).apply()
+    }
+
+    fun toggleAppDarkMode() {
+        val newValue = !_isAppDarkMode.value
+        _isAppDarkMode.value = newValue
+        viewSettingsPrefs.edit().putBoolean("app_dark_mode", newValue).apply()
     }
     fun toggleGridView() {
         val newValue = !_isGridView.value

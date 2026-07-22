@@ -841,6 +841,7 @@ fun LibraryScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val allCategories by viewModel.allCategories.collectAsState()
     val isTrueDarkMode by viewModel.isTrueDarkMode.collectAsState()
+    val isAppDarkMode by viewModel.isAppDarkMode.collectAsState()
 
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var folderNameInput by remember { mutableStateOf("") }
@@ -1608,8 +1609,25 @@ fun LibraryScreen(
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                 )
                 ListItem(
-                    headlineContent = { Text("True Dark Mode", color = MaterialTheme.colorScheme.onSurface) },
-                    supportingContent = { Text(if (isTrueDarkMode) "Active (OLED Black)" else "Inactive (Light Mode)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                    headlineContent = { Text("App Dark Mode", color = MaterialTheme.colorScheme.onSurface) },
+                    supportingContent = { Text(if (isAppDarkMode) "Active (Dark UI)" else "Inactive (Light UI)", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
+                    leadingContent = { Icon(Icons.Outlined.DarkMode, null, tint = Color(0xFF2F80ED)) },
+                    trailingContent = {
+                        Switch(
+                            checked = isAppDarkMode,
+                            onCheckedChange = { viewModel.toggleAppDarkMode() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFF2F80ED),
+                                checkedTrackColor = Color(0xFF2F80ED).copy(alpha = 0.4f)
+                            )
+                        )
+                    },
+                    modifier = Modifier.clickable { viewModel.toggleAppDarkMode() },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                )
+                ListItem(
+                    headlineContent = { Text("PDF True Dark Mode", color = MaterialTheme.colorScheme.onSurface) },
+                    supportingContent = { Text(if (isTrueDarkMode) "Active (OLED Black)" else "Inactive", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)) },
                     leadingContent = { Icon(Icons.Outlined.Contrast, null, tint = Color(0xFF2F80ED)) },
                     trailingContent = {
                         Switch(

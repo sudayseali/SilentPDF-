@@ -35,8 +35,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val viewModel: SilentPdfViewModel = viewModel()
-            val isTrueDarkMode by viewModel.isTrueDarkMode.collectAsState()
-            MyApplicationTheme(darkTheme = isTrueDarkMode) {
+            val isAppDarkMode by viewModel.isAppDarkMode.collectAsState()
+            MyApplicationTheme(darkTheme = isAppDarkMode) {
                 SilentPdfApp(viewModel = viewModel)
             }
         }

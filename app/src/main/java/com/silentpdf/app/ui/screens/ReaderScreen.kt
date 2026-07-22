@@ -149,17 +149,18 @@ fun ReaderScreen(
     val currentPage by viewModel.currentPage.collectAsState()
     val pageBitmap by viewModel.currentPageBitmap.collectAsState()
     val isTrueDarkMode by viewModel.isTrueDarkMode.collectAsState()
+    val isAppDarkMode by viewModel.isAppDarkMode.collectAsState()
     val isPdfLoading by viewModel.isPdfLoading.collectAsState()
     val bookmarks by viewModel.currentBookmarks.collectAsState()
     val pageDrawings by viewModel.pageDrawings.collectAsState()
     val openedPdfTextPages by viewModel.openedPdfTextPages.collectAsState()
 
-    val readerBgColor = if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.background
-    val readerSurfaceColor = if (isTrueDarkMode) Color(0xFF111422) else MaterialTheme.colorScheme.surface
-    val readerBorderColor = if (isTrueDarkMode) Color.White.copy(alpha = 0.08f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
-    val readerOnSurfaceColor = if (isTrueDarkMode) Color(0xFFF1F5F9) else MaterialTheme.colorScheme.onSurface
-    val readerOnSurfaceVariantColor = if (isTrueDarkMode) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
-    val readerButtonBgColor = if (isTrueDarkMode) Color(0xFF1E263D).copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val readerBgColor = if (isAppDarkMode) Color.Black else MaterialTheme.colorScheme.background
+    val readerSurfaceColor = if (isAppDarkMode) Color(0xFF111422) else MaterialTheme.colorScheme.surface
+    val readerBorderColor = if (isAppDarkMode) Color.White.copy(alpha = 0.08f) else MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+    val readerOnSurfaceColor = if (isAppDarkMode) Color(0xFFF1F5F9) else MaterialTheme.colorScheme.onSurface
+    val readerOnSurfaceVariantColor = if (isAppDarkMode) Color(0xFF94A3B8) else MaterialTheme.colorScheme.onSurfaceVariant
+    val readerButtonBgColor = if (isAppDarkMode) Color(0xFF1E263D).copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
 
     // Password decrypt flows
     val isPasswordProtected by viewModel.isPasswordProtected.collectAsState()
@@ -749,13 +750,16 @@ fun ReaderScreen(
                                 )
                                 .padding(top = 40.dp, bottom = 16.dp, start = 16.dp, end = 16.dp)
                         ) {
-                            Row(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(readerSurfaceColor.copy(alpha = 0.85f))
                                     .border(1.dp, readerBorderColor, RoundedCornerShape(20.dp))
-                                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                                    .padding(horizontal = 8.dp, vertical = 8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
@@ -811,6 +815,12 @@ fun ReaderScreen(
                                         modifier = Modifier.size(36.dp)
                                     ) {
                                         Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
+                                    }
+                                    IconButton(
+                                        onClick = { isBionicMode = !isBionicMode },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(Icons.Default.Bolt, contentDescription = "Bionic Reading", tint = if (isBionicMode) Color(0xFFFFB300) else readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                     }
                                     val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                     IconButton(
@@ -884,14 +894,7 @@ fun ReaderScreen(
                                                     showMoreMenu = false
                                                 }
                                             )
-                                            DropdownMenuItem(
-                                                text = { Text(if (isBionicMode) "Exit Bionic Mode" else "Bionic Reading", color = readerOnSurfaceColor) },
-                                                leadingIcon = { Icon(Icons.Default.Bolt, null, tint = Color(0xFFFFB300)) },
-                                                onClick = {
-                                                    isBionicMode = !isBionicMode
-                                                    showMoreMenu = false
-                                                }
-                                            )
+
                                             DropdownMenuItem(
                                                 text = { Text("Extract Text (OCR)", color = readerOnSurfaceColor) },
                                                 leadingIcon = { Icon(Icons.Default.DocumentScanner, null, tint = Color(0xFF9C27B0)) },
@@ -915,6 +918,28 @@ fun ReaderScreen(
                                                 }
                                             )
                                         }
+                                    }
+                                }
+                                }
+                                if (pageCount > 0) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        androidx.compose.material3.LinearProgressIndicator(
+                                            progress = { (currentPage + 1).toFloat() / pageCount.toFloat() },
+                                            modifier = Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)),
+                                            color = Color(0xFF2F80ED),
+                                            trackColor = readerOnSurfaceVariantColor.copy(alpha = 0.2f),
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = "${currentPage + 1} / $pageCount",
+                                            fontSize = 11.sp,
+                                            color = readerOnSurfaceVariantColor,
+                                            fontWeight = FontWeight.Bold
+                                        )
                                     }
                                 }
                             }
@@ -1185,7 +1210,7 @@ fun ReaderScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
-                        .background(if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                        .background(if (isAppDarkMode) Color.Black else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         .onSizeChanged { size ->
                             if (size.width > 0 && viewWidth != size.width) {
                                 viewWidth = size.width
