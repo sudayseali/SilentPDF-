@@ -14,6 +14,12 @@ import com.silentpdf.app.data.db.SilentPdfDatabase
 import com.silentpdf.app.data.repository.PdfRenderEngine
 import com.silentpdf.app.data.repository.PdfRepository
 import com.silentpdf.app.data.repository.PdfTextSearcher
+import com.silentpdf.app.bionic.BionicConfig
+import com.silentpdf.app.bionic.BionicIntensity
+import com.silentpdf.app.bionic.BionicLanguage
+import com.silentpdf.app.bionic.BionicPerformanceMode
+import com.silentpdf.app.bionic.BionicReadingEngine
+import com.silentpdf.app.bionic.ProcessedBionicPage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -89,6 +95,65 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isHorizontalScroll = MutableStateFlow(viewSettingsPrefs.getBoolean("horizontal_scroll", false))
     val isHorizontalScroll: StateFlow<Boolean> = _isHorizontalScroll
+
+    // Advanced Bionic Reading Settings
+    private val bionicPrefs = application.getSharedPreferences("app_bionic_settings", android.content.Context.MODE_PRIVATE)
+
+    private val _bionicConfig = MutableStateFlow(
+        BionicConfig(
+            isEnabled = bionicPrefs.getBoolean("is_enabled", false),
+            intensity = try { BionicIntensity.valueOf(bionicPrefs.getString("intensity", "MEDIUM") ?: "MEDIUM") } catch (e: Exception) { BionicIntensity.MEDIUM },
+            customIntensityPercentage = bionicPrefs.getFloat("custom_percentage", 0.50f),
+            language = try { BionicLanguage.valueOf(bionicPrefs.getString("language", "AUTO") ?: "AUTO") } catch (e: Exception) { BionicLanguage.AUTO },
+            performanceMode = try { BionicPerformanceMode.valueOf(bionicPrefs.getString("performance_mode", "QUALITY") ?: "QUALITY") } catch (e: Exception) { BionicPerformanceMode.QUALITY },
+            autoOcrForScanned = bionicPrefs.getBoolean("auto_ocr", true)
+        )
+    )
+    val bionicConfig: StateFlow<BionicConfig> = _bionicConfig
+
+    fun updateBionicConfig(
+        isEnabled: Boolean = _bionicConfig.value.isEnabled,
+        intensity: BionicIntensity = _bionicConfig.value.intensity,
+        customPercentage: Float = _bionicConfig.value.customIntensityPercentage,
+        language: BionicLanguage = _bionicConfig.value.language,
+        performanceMode: BionicPerformanceMode = _bionicConfig.value.performanceMode,
+        autoOcrForScanned: Boolean = _bionicConfig.value.autoOcrForScanned
+    ) {
+        val newConfig = BionicConfig(
+            isEnabled = isEnabled,
+            intensity = intensity,
+            customIntensityPercentage = customPercentage,
+            language = language,
+            performanceMode = performanceMode,
+            autoOcrForScanned = autoOcrForScanned
+        )
+        _bionicConfig.value = newConfig
+        bionicPrefs.edit()
+            .putBoolean("is_enabled", isEnabled)
+            .putString("intensity", intensity.name)
+            .putFloat("custom_percentage", customPercentage)
+            .putString("language", language.name)
+            .putString("performance_mode", performanceMode.name)
+            .putBoolean("auto_ocr", autoOcrForScanned)
+            .apply()
+    }
+
+    suspend fun processBionicPage(
+        pdfUri: String,
+        pageIndex: Int,
+        rawText: String,
+        bitmap: Bitmap?,
+        textColor: Color = Color.Unspecified
+    ): ProcessedBionicPage {
+        return BionicReadingEngine.processPage(
+            pdfUri = pdfUri,
+            pageIndex = pageIndex,
+            rawText = rawText,
+            bitmap = bitmap,
+            config = _bionicConfig.value,
+            textColor = textColor
+        )
+    }
 
     // State: Password decryption for encrypted PDFs
     private val _isPasswordProtected = MutableStateFlow(false)

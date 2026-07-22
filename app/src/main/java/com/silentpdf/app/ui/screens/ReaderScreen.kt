@@ -5,6 +5,8 @@ import android.content.Context
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.silentpdf.app.bionic.BionicConfig
+import com.silentpdf.app.bionic.ProcessedBionicPage
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.widget.Toast
@@ -213,9 +215,11 @@ fun ReaderScreen(
     var showMoreMenu by remember { mutableStateOf(false) }
     var showVoiceRecorderDialog by remember { mutableStateOf(false) }
     var showOcrDialog by remember { mutableStateOf(false) }
-    var isBionicMode by remember { mutableStateOf(false) }
+    var showBionicSettingsDialog by remember { mutableStateOf(false) }
     var isOcrProcessing by remember { mutableStateOf(false) }
     var ocrExtractedText by remember { mutableStateOf("") }
+
+    val bionicConfig by viewModel.bionicConfig.collectAsState()
 
     val isRecording by viewModel.isRecording.collectAsState()
     val recordingSeconds by viewModel.recordingSeconds.collectAsState()
@@ -817,10 +821,10 @@ fun ReaderScreen(
                                         Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                     }
                                     IconButton(
-                                        onClick = { isBionicMode = !isBionicMode },
+                                        onClick = { viewModel.updateBionicConfig(isEnabled = !bionicConfig.isEnabled) },
                                         modifier = Modifier.size(36.dp)
                                     ) {
-                                        Icon(Icons.Default.Bolt, contentDescription = "Bionic Reading", tint = if (isBionicMode) Color(0xFFFFB300) else readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
+                                        Icon(Icons.Default.Bolt, contentDescription = "Bionic Reading", tint = if (bionicConfig.isEnabled) Color(0xFFFFB300) else readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
                                     }
                                     val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                     IconButton(
@@ -859,6 +863,14 @@ fun ReaderScreen(
                                                      val existing = currentNotes.find { it.pageNumber == currentPage }
                                                      noteInputText = existing?.noteText ?: ""
                                                      showNoteDialog = true
+                                                     showMoreMenu = false
+                                                 }
+                                             )
+                                             DropdownMenuItem(
+                                                 text = { Text("AI Bionic Reading Settings", color = readerOnSurfaceColor) },
+                                                 leadingIcon = { Icon(Icons.Default.Bolt, null, tint = Color(0xFFFFB300)) },
+                                                 onClick = {
+                                                     showBionicSettingsDialog = true
                                                      showMoreMenu = false
                                                  }
                                              )
@@ -1302,12 +1314,41 @@ fun ReaderScreen(
                         )
                     }
 
+                    if (showBionicSettingsDialog) {
+                        BionicSettingsDialog(
+                            config = bionicConfig,
+                            onDismissRequest = { showBionicSettingsDialog = false },
+                            onConfigChanged = { newConfig ->
+                                viewModel.updateBionicConfig(
+                                    isEnabled = newConfig.isEnabled,
+                                    intensity = newConfig.intensity,
+                                    customPercentage = newConfig.customIntensityPercentage,
+                                    language = newConfig.language,
+                                    performanceMode = newConfig.performanceMode,
+                                    autoOcrForScanned = newConfig.autoOcrForScanned
+                                )
+                            }
+                        )
+                    }
+
                     if (isPdfLoading) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     } else if (pageBitmap != null) {
                         val bitmap = pageBitmap!!
-                        if (isBionicMode) {
-                            val pageText = openedPdfTextPages.getOrNull(currentPage) ?: "Extracting text..."
+                        if (bionicConfig.isEnabled) {
+                            val pageText = openedPdfTextPages.getOrNull(currentPage) ?: ""
+                            var processedPage by remember(currentPage, bionicConfig, pageText, bitmap) { mutableStateOf<ProcessedBionicPage?>(null) }
+
+                            LaunchedEffect(currentPage, bionicConfig, pageText, bitmap) {
+                                processedPage = viewModel.processBionicPage(
+                                    pdfUri = currentPdf?.uriString ?: "",
+                                    pageIndex = currentPage,
+                                    rawText = pageText,
+                                    bitmap = bitmap,
+                                    textColor = readerOnSurfaceColor
+                                )
+                            }
+
                             LazyColumn(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -1315,8 +1356,11 @@ fun ReaderScreen(
                             ) {
                                 item {
                                     BionicText(
-                                        text = pageText.ifEmpty { "No text found on this page." },
-                                        color = readerOnSurfaceColor
+                                        processedPage = processedPage,
+                                        fallbackText = pageText,
+                                        config = bionicConfig,
+                                        textColor = readerOnSurfaceColor,
+                                        onOpenSettings = { showBionicSettingsDialog = true }
                                     )
                                 }
                             }
