@@ -1,6 +1,14 @@
 package com.silentpdf.app.ui.screens
 
 import android.content.Context
+
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.widget.Toast
+
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
@@ -144,6 +152,7 @@ fun ReaderScreen(
     val isPdfLoading by viewModel.isPdfLoading.collectAsState()
     val bookmarks by viewModel.currentBookmarks.collectAsState()
     val pageDrawings by viewModel.pageDrawings.collectAsState()
+    val openedPdfTextPages by viewModel.openedPdfTextPages.collectAsState()
 
     val readerBgColor = if (isTrueDarkMode) Color.Black else MaterialTheme.colorScheme.background
     val readerSurfaceColor = if (isTrueDarkMode) Color(0xFF111422) else MaterialTheme.colorScheme.surface
@@ -202,6 +211,10 @@ fun ReaderScreen(
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showVoiceRecorderDialog by remember { mutableStateOf(false) }
+    var showOcrDialog by remember { mutableStateOf(false) }
+    var isBionicMode by remember { mutableStateOf(false) }
+    var isOcrProcessing by remember { mutableStateOf(false) }
+    var ocrExtractedText by remember { mutableStateOf("") }
 
     val isRecording by viewModel.isRecording.collectAsState()
     val recordingSeconds by viewModel.recordingSeconds.collectAsState()
@@ -871,6 +884,36 @@ fun ReaderScreen(
                                                     showMoreMenu = false
                                                 }
                                             )
+                                            DropdownMenuItem(
+                                                text = { Text(if (isBionicMode) "Exit Bionic Mode" else "Bionic Reading", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.Bolt, null, tint = Color(0xFFFFB300)) },
+                                                onClick = {
+                                                    isBionicMode = !isBionicMode
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Extract Text (OCR)", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.DocumentScanner, null, tint = Color(0xFF9C27B0)) },
+                                                onClick = {
+                                                    showMoreMenu = false
+                                                    if (pageBitmap != null) {
+                                                        isOcrProcessing = true
+                                                        showOcrDialog = true
+                                                        val image = InputImage.fromBitmap(pageBitmap!!, 0)
+                                                        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                                                        recognizer.process(image)
+                                                            .addOnSuccessListener { visionText ->
+                                                                ocrExtractedText = visionText.text
+                                                                isOcrProcessing = false
+                                                            }
+                                                            .addOnFailureListener { e ->
+                                                                ocrExtractedText = "Failed to extract text: ${e.message}"
+                                                                isOcrProcessing = false
+                                                            }
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -1176,10 +1219,83 @@ fun ReaderScreen(
                         )
                     }
 
+                    if (showOcrDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showOcrDialog = false },
+                            title = { Text("Extracted Text", fontWeight = FontWeight.Bold) },
+                            text = {
+                                if (isOcrProcessing) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        CircularProgressIndicator()
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text("Extracting text...", style = MaterialTheme.typography.bodyMedium)
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)
+                                    ) {
+                                        item {
+                                            OutlinedTextField(
+                                                value = ocrExtractedText,
+                                                onValueChange = { ocrExtractedText = it },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                placeholder = { Text("No text found on this page.") },
+                                                textStyle = MaterialTheme.typography.bodyMedium,
+                                                colors = OutlinedTextFieldDefaults.colors(
+                                                    unfocusedBorderColor = Color.Transparent,
+                                                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        if (ocrExtractedText.isNotEmpty()) {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("OCR Text", ocrExtractedText)
+                                            clipboard.setPrimaryClip(clip)
+                                            Toast.makeText(context, "Text copied to clipboard", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    enabled = !isOcrProcessing && ocrExtractedText.isNotEmpty(),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("Copy")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showOcrDialog = false }) {
+                                    Text("Close")
+                                }
+                            }
+                        )
+                    }
+
                     if (isPdfLoading) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     } else if (pageBitmap != null) {
                         val bitmap = pageBitmap!!
+                        if (isBionicMode) {
+                            val pageText = openedPdfTextPages.getOrNull(currentPage) ?: "Extracting text..."
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(16.dp)
+                            ) {
+                                item {
+                                    BionicText(
+                                        text = pageText.ifEmpty { "No text found on this page." },
+                                        color = readerOnSurfaceColor
+                                    )
+                                }
+                            }
+                        } else {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -1388,6 +1504,7 @@ fun ReaderScreen(
                                 }
                             }
                         }
+                    }
                     } else if (pageCount > 0) {
                         Text("Could not load this page", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }

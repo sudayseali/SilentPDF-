@@ -87,6 +87,9 @@ dependencies {
     // Navigation Compose
     implementation(libs.androidx.navigation.compose)
     
+    // ML Kit Text Recognition
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     

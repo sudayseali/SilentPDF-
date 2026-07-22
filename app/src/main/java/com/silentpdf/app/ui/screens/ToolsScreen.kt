@@ -173,9 +173,16 @@ fun ToolsScreenContent(
                     }
                     ActiveTool.PdfToLongImage -> {
                         scope.launch {
-                            val success = convertPdfToLongImage(context, pdf)
-                            if (success) {
-                                Toast.makeText(context, "Long Image saved to gallery!", Toast.LENGTH_LONG).show()
+                            val file = convertPdfToLongImage(context, pdf)
+                            if (file != null) {
+                                Toast.makeText(context, "Long Image created!", Toast.LENGTH_SHORT).show()
+                                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "image/jpeg"
+                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Long Image"))
                             } else {
                                 Toast.makeText(context, "Failed to convert to long image", Toast.LENGTH_SHORT).show()
                             }
@@ -574,6 +581,10 @@ fun ToolsScreenContent(
                 ToolItemData("Unlock PDF", Icons.Outlined.LockOpen, Color(0xFF2196F3), { onToolClick(ActiveTool.Unlock) })
             )
         )
+
+        Spacer(modifier = Modifier.height(32.dp))
+        NoWatermarkPromise()
+        Spacer(modifier = Modifier.height(100.dp))
 
         Spacer(modifier = Modifier.height(48.dp))
     }
@@ -1352,11 +1363,11 @@ suspend fun convertPdfToImages(context: Context, pdf: PdfEntity): Boolean = with
     }
 }
 
-suspend fun convertPdfToLongImage(context: Context, pdf: PdfEntity): Boolean = withContext(Dispatchers.IO) {
+suspend fun convertPdfToLongImage(context: Context, pdf: PdfEntity): java.io.File? = withContext(Dispatchers.IO) {
     try {
         val contentResolver = context.contentResolver
         val uri = Uri.parse(pdf.uriString)
-        val pfd = contentResolver.openFileDescriptor(uri, "r") ?: return@withContext false
+        val pfd = contentResolver.openFileDescriptor(uri, "r") ?: return@withContext null
         val renderer = PdfRenderer(pfd)
         
         val maxPagesToStack = minOf(renderer.pageCount, 12)
@@ -1399,10 +1410,10 @@ suspend fun convertPdfToLongImage(context: Context, pdf: PdfEntity): Boolean = w
             longBitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
         }
         longBitmap.recycle()
-        return@withContext true
+        return@withContext outFile
     } catch (e: Exception) {
         e.printStackTrace()
-        return@withContext false
+        return@withContext null
     }
 }
 
@@ -1640,5 +1651,37 @@ suspend fun burnSignatureToPdf(context: Context, pdf: PdfEntity, signature: Bitm
     } catch (e: Exception) {
         e.printStackTrace()
         return@withContext null
+    }
+}
+
+@Composable
+fun NoWatermarkPromise() {
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(
+            containerColor = androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        ),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Outlined.Verified, contentDescription = "Verified", tint = Color(0xFF4CAF50), modifier = Modifier.size(32.dp))
+            Text(
+                text = "100% Free • No Watermarks • Offline & Private",
+                style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Text(
+                text = "Everything you create or edit is yours. We never add watermarks.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                color = androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        }
     }
 }

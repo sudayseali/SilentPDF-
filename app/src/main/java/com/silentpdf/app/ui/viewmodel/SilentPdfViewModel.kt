@@ -590,6 +590,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
         private val _openedPdfTextPages = MutableStateFlow<List<String>>(emptyList())
+    val openedPdfTextPages: StateFlow<List<String>> = _openedPdfTextPages
 
     private fun cachePdfText(uri: Uri) {
         viewModelScope.launch {
