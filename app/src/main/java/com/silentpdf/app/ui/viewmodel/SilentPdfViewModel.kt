@@ -579,6 +579,18 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateCurrentPage(pageIndex: Int) {
+        val total = _pageCount.value
+        if (pageIndex in 0 until total) {
+            _currentPage.value = pageIndex
+            _currentPdf.value?.let { pdf ->
+                viewModelScope.launch {
+                    repository.updateProgress(pdf.uriString, pageIndex, total)
+                }
+            }
+        }
+    }
+
     fun renderCurrentPage(targetWidth: Int) {
         viewModelScope.launch {
             val page = _currentPage.value
@@ -586,6 +598,14 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 val bitmap = renderEngine.renderPage(page, targetWidth)
                 _currentPageBitmap.value = bitmap
             }
+        }
+    }
+
+    suspend fun getPageBitmap(pageIndex: Int, targetWidth: Int): Bitmap? {
+        return if (_pageCount.value > 0 && pageIndex in 0 until _pageCount.value) {
+            renderEngine.renderPage(pageIndex, targetWidth)
+        } else {
+            null
         }
     }
 

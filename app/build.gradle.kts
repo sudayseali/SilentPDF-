@@ -97,6 +97,9 @@ dependencies {
     implementation(libs.coil.compose)
     
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.core)
+    testImplementation(libs.androidx.runner)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

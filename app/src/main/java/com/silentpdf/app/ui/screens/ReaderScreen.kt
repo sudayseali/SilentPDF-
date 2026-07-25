@@ -53,6 +53,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -210,7 +211,7 @@ fun ReaderScreen(
         ))
     }
 
-    var isFullScreen by remember { mutableStateOf(false) }
+    var isFullScreen by remember { mutableStateOf(true) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showVoiceRecorderDialog by remember { mutableStateOf(false) }
@@ -803,29 +804,6 @@ fun ReaderScreen(
                                         Icon(Icons.Default.Search, contentDescription = "Search text", tint = Color(0xFF2F80ED), modifier = Modifier.size(20.dp))
                                     }
                                     
-                                    IconButton(
-                                        onClick = { isDrawingMode = !isDrawingMode },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Draw / Write",
-                                            tint = if (isDrawingMode) Color(0xFF2F80ED) else readerOnSurfaceVariantColor,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.toggleTrueDarkMode() },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.Outlined.Contrast, contentDescription = "Black / White", tint = readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.updateBionicConfig(isEnabled = !bionicConfig.isEnabled) },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(Icons.Default.Bolt, contentDescription = "Bionic Reading", tint = if (bionicConfig.isEnabled) Color(0xFFFFB300) else readerOnSurfaceVariantColor, modifier = Modifier.size(20.dp))
-                                    }
                                     val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                     IconButton(
                                         onClick = { viewModel.toggleBookmarkCurrentPage() },
@@ -856,6 +834,40 @@ fun ReaderScreen(
                                             onDismissRequest = { showMoreMenu = false },
                                             modifier = Modifier.background(readerSurfaceColor)
                                         ) {
+                                            DropdownMenuItem(
+                                                text = { Text(if (isDrawingMode) "Exit Drawing Mode" else "Draw / Annotate", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Default.Edit, null, tint = if (isDrawingMode) Color(0xFF2F80ED) else readerOnSurfaceVariantColor) },
+                                                onClick = {
+                                                    isDrawingMode = !isDrawingMode
+                                                    if (isDrawingMode) isFullScreen = false
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("High Contrast Mode", color = readerOnSurfaceColor) },
+                                                leadingIcon = { Icon(Icons.Outlined.Contrast, null, tint = readerOnSurfaceVariantColor) },
+                                                onClick = {
+                                                    viewModel.toggleTrueDarkMode()
+                                                    showMoreMenu = false
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("Bionic Reading", color = readerOnSurfaceColor)
+                                                        Spacer(modifier = Modifier.width(16.dp))
+                                                        Switch(
+                                                            checked = bionicConfig.isEnabled,
+                                                            onCheckedChange = { viewModel.updateBionicConfig(isEnabled = it) },
+                                                            modifier = Modifier.scale(0.8f)
+                                                        )
+                                                    }
+                                                },
+                                                leadingIcon = { Icon(Icons.Default.Bolt, null, tint = if (bionicConfig.isEnabled) Color(0xFFFFB300) else readerOnSurfaceVariantColor) },
+                                                onClick = {
+                                                    viewModel.updateBionicConfig(isEnabled = !bionicConfig.isEnabled)
+                                                }
+                                            )
                                              DropdownMenuItem(
                                                  text = { Text("Add/Edit Note", color = readerOnSurfaceColor) },
                                                  leadingIcon = { Icon(Icons.Default.Edit, null, tint = Color(0xFF2F80ED)) },
@@ -1129,23 +1141,11 @@ fun ReaderScreen(
                                     }
                                 }
 
-                                // Jump button and page controllers
-                                Row(
+                                // Jump button
+                                Box(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    IconButton(
-                                        onClick = { viewModel.jumpToPage(currentPage - 1, viewWidth) },
-                                        enabled = currentPage > 0,
-                                        modifier = Modifier.background(
-                                            color = if (currentPage > 0) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(Icons.Default.ChevronLeft, contentDescription = "Go to previous page")
-                                    }
-
                                     var showJumpDialog by remember { mutableStateOf(false) }
                                     Text(
                                         text = "Page ${currentPage + 1} of $pageCount",
@@ -1199,17 +1199,6 @@ fun ReaderScreen(
                                             },
                                             shape = RoundedCornerShape(24.dp)
                                         )
-                                    }
-
-                                    IconButton(
-                                        onClick = { viewModel.jumpToPage(currentPage + 1, viewWidth) },
-                                        enabled = currentPage < pageCount - 1,
-                                        modifier = Modifier.background(
-                                            color = if (currentPage < pageCount - 1) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                            shape = CircleShape
-                                        )
-                                    ) {
-                                        Icon(Icons.Default.ChevronRight, contentDescription = "Go to next page")
                                     }
                                 }
                             }
@@ -1333,93 +1322,23 @@ fun ReaderScreen(
 
                     if (isPdfLoading) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    } else if (pageBitmap != null) {
-                        val bitmap = pageBitmap!!
-                        if (bionicConfig.isEnabled) {
-                            val pageText = openedPdfTextPages.getOrNull(currentPage) ?: ""
-                            var processedPage by remember(currentPage, bionicConfig, pageText, bitmap) { mutableStateOf<ProcessedBionicPage?>(null) }
-
-                            LaunchedEffect(currentPage, bionicConfig, pageText, bitmap) {
-                                processedPage = viewModel.processBionicPage(
-                                    pdfUri = currentPdf?.uriString ?: "",
-                                    pageIndex = currentPage,
-                                    rawText = pageText,
-                                    bitmap = bitmap,
-                                    textColor = readerOnSurfaceColor
-                                )
-                            }
-
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp)
-                            ) {
-                                item {
-                                    BionicText(
-                                        processedPage = processedPage,
-                                        fallbackText = pageText,
-                                        config = bionicConfig,
-                                        textColor = readerOnSurfaceColor,
-                                        onOpenSettings = { showBionicSettingsDialog = true }
-                                    )
-                                }
-                            }
-                        } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(isDrawingMode) {
-                                    if (isDrawingMode) {
-                                        detectDragGestures(
-                                            onDragStart = { startOffset ->
-                                                val centerX = size.width / 2f
-                                                val centerY = size.height / 2f
-                                                val unscaledX = (startOffset.x - offset.x - centerX) / scale + centerX
-                                                val unscaledY = (startOffset.y - offset.y - centerY) / scale + centerY
-                                                currentStroke = DrawingStroke(
-                                                    points = listOf(Offset(unscaledX, unscaledY)),
-                                                    color = if (isHighlighterMode) selectedColor.copy(alpha = 0.4f) else selectedColor,
-                                                    width = (if (isHighlighterMode) strokeWidth * 3f else strokeWidth) / scale,
-                                                    isEraser = isEraserMode
-                                                )
-                                            },
-                                            onDrag = { change, _ ->
-                                                val centerX = size.width / 2f
-                                                val centerY = size.height / 2f
-                                                val unscaledX = (change.position.x - offset.x - centerX) / scale + centerX
-                                                val unscaledY = (change.position.y - offset.y - centerY) / scale + centerY
-                                                currentStroke = currentStroke?.copy(
-                                                    points = currentStroke!!.points + Offset(unscaledX, unscaledY)
-                                                )
-                                            },
-                                            onDragEnd = {
-                                                currentStroke?.let { stroke ->
-                                                    if (stroke.points.size > 1) {
-                                                        currentPdf?.uriString?.let { uri ->
-                                                            viewModel.addStroke(uri, currentPage, stroke)
-                                                        }
-                                                    }
-                                                }
-                                                currentStroke = null
-                                            },
-                                            onDragCancel = {
-                                                currentStroke = null
-                                            }
-                                        )
-                                    } else {
-                                        detectTransformGestures { _, pan, zoom, _ ->
-                                            scale = (scale * zoom).coerceIn(1f, 4f)
-                                            if (scale > 1f) {
-                                                offset = Offset(
-                                                    x = offset.x + pan.x,
-                                                    y = offset.y + pan.y
-                                                )
-                                            } else {
-                                                offset = Offset.Zero
-                                            }
-                                        }
+                    } else if (pageCount > 0) {
+                        val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = currentPage)
+                        
+                        LaunchedEffect(listState) {
+                            snapshotFlow { listState.firstVisibleItemIndex }
+                                .collect { index ->
+                                    if (currentPage != index && !isPdfLoading) {
+                                        viewModel.updateCurrentPage(index)
                                     }
                                 }
+                        }
+
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            state = listState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(if (isTrueDarkMode) Color.Black else Color.DarkGray)
                                 .pointerInput(isDrawingMode) {
                                     detectTapGestures(onTap = {
                                         if (!isDrawingMode) {
@@ -1428,154 +1347,49 @@ fun ReaderScreen(
                                     })
                                 }
                         ) {
-                            val layerModifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer {
-                                    scaleX = scale
-                                    scaleY = scale
-                                    translationX = offset.x
-                                    translationY = offset.y
-                                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                                }
-
-                            Box(modifier = layerModifier) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "PDF Page",
-                                    colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                                
-                                Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val pdfUri = currentPdf?.uriString ?: return@Canvas
-                                    val strokes = pageDrawings[pdfUri]?.get(currentPage) ?: emptyList()
-                                    
-                                    val drawStroke = { stroke: DrawingStroke ->
-                                        if (stroke.points.size > 1) {
-                                            val path = androidx.compose.ui.graphics.Path().apply {
-                                                moveTo(stroke.points.first().x, stroke.points.first().y)
-                                                for (i in 1 until stroke.points.size) {
-                                                    lineTo(stroke.points[i].x, stroke.points[i].y)
+                            items(pageCount) { index ->
+                                Column {
+                                    PdfPageItem(
+                                        pageIndex = index,
+                                        targetWidth = viewWidth,
+                                        viewModel = viewModel,
+                                        bionicConfig = bionicConfig,
+                                        isTrueDarkMode = isTrueDarkMode,
+                                        invertColorMatrix = invertColorMatrix,
+                                        pageDrawings = pageDrawings,
+                                        currentNotes = currentNotes,
+                                        isDrawingMode = isDrawingMode,
+                                        isHighlighterMode = isHighlighterMode,
+                                        isEraserMode = isEraserMode,
+                                        selectedColor = selectedColor,
+                                        strokeWidth = strokeWidth,
+                                        currentPdf = currentPdf,
+                                        readerOnSurfaceColor = readerOnSurfaceColor,
+                                        onOpenBionicSettings = { showBionicSettingsDialog = true },
+                                        onNoteClick = { text ->
+                                            noteInputText = text
+                                            showNoteDialog = true
+                                        },
+                                        onNoteDelete = { pageIdx, text ->
+                                            val note = currentNotes.find { it.pageNumber == pageIdx }
+                                            if (note != null) {
+                                                if (text.isNotEmpty()) {
+                                                    viewModel.addOrUpdateNote(pageIdx, text)
+                                                } else {
+                                                    viewModel.removeNote(note.id)
                                                 }
                                             }
-                                            drawPath(
-                                                path = path,
-                                                color = if (stroke.isEraser) Color.Transparent else stroke.color,
-                                                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                                                    width = stroke.width,
-                                                    cap = StrokeCap.Round,
-                                                    join = StrokeJoin.Round
-                                                ),
-                                                blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
-                                            )
                                         }
-                                    }
-
-                                    strokes.forEach(drawStroke)
-                                    currentStroke?.let(drawStroke)
-                                }
-                            }
-                        }
-
-                        // If current page has a note, show a beautiful badge overlay
-                        val currentPageNote = currentNotes.find { it.pageNumber == currentPage }
-                        if (currentPageNote != null) {
-                            val audioPath = if (currentPageNote.noteText.startsWith("[audio:")) {
-                                currentPageNote.noteText.substringAfter("[audio:").substringBefore("]")
-                            } else null
-                            val cleanText = if (currentPageNote.noteText.startsWith("[audio:")) {
-                                currentPageNote.noteText.substringAfter("]").trim()
-                            } else currentPageNote.noteText
-
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.TopEnd
-                            ) {
-                                if (audioPath != null) {
-                                    Card(
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f)
-                                        ),
-                                        shape = RoundedCornerShape(16.dp),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                                        modifier = Modifier.widthIn(max = 280.dp)
-                                    ) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            VoiceNotePlayer(
-                                                filePath = audioPath,
-                                                onDelete = {
-                                                    if (cleanText.isNotEmpty()) {
-                                                        viewModel.addOrUpdateNote(currentPage, cleanText)
-                                                    } else {
-                                                        viewModel.removeNote(currentPageNote.id)
-                                                    }
-                                                }
-                                            )
-                                            if (cleanText.isNotEmpty()) {
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = cleanText,
-                                                    fontSize = 11.sp,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                    modifier = Modifier.padding(horizontal = 8.dp).clickable {
-                                                        noteInputText = cleanText
-                                                        showNoteDialog = true
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    }
-                                } else if (cleanText.isNotEmpty()) {
-                                    Card(
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.95f),
-                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                                        ),
-                                        shape = RoundedCornerShape(12.dp),
-                                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-                                        modifier = Modifier
-                                            .widthIn(max = 240.dp)
-                                            .clickable {
-                                                noteInputText = cleanText
-                                                showNoteDialog = true
-                                            }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Description,
-                                                contentDescription = "Note",
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Page Note",
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
-                                                Text(
-                                                    text = cleanText,
-                                                    fontSize = 12.sp,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        }
+                                    )
+                                    if (index < pageCount - 1) {
+                                        androidx.compose.material3.HorizontalDivider(
+                                            thickness = 2.dp,
+                                            color = if (isTrueDarkMode) Color.DarkGray else Color.Black
+                                        )
                                     }
                                 }
                             }
                         }
-                    }
-                    } else if (pageCount > 0) {
-                        Text("Could not load this page", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
                     }
                 }
             }
