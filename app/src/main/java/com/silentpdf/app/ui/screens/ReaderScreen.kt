@@ -31,6 +31,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -189,6 +191,8 @@ fun ReaderScreen(
     var strokeWidth by remember { mutableStateOf(8f) }
     var isEraserMode by remember { mutableStateOf(false) }
     var isHighlighterMode by remember { mutableStateOf(false) }
+    var isUnderlineMode by remember { mutableStateOf(false) }
+    var isTextMode by remember { mutableStateOf(false) }
 
     val drawingColors = listOf(
         Color(0xFFF44336), // Red
@@ -211,12 +215,37 @@ fun ReaderScreen(
         ))
     }
 
+    val sepiaColorMatrix = remember {
+        ColorMatrix(floatArrayOf(
+            0.393f, 0.769f, 0.189f, 0f, 0f,
+            0.349f, 0.686f, 0.168f, 0f, 0f,
+            0.272f, 0.534f, 0.131f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        ))
+    }
+
     var isFullScreen by remember { mutableStateOf(true) }
     var showInfoDialog by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
     var showVoiceRecorderDialog by remember { mutableStateOf(false) }
     var showOcrDialog by remember { mutableStateOf(false) }
     var showBionicSettingsDialog by remember { mutableStateOf(false) }
+    var showSignDialog by remember { mutableStateOf(false) }
+    var showReadingModeMenu by remember { mutableStateOf(false) }
+    
+    var readingStyle by remember { mutableStateOf("Scroll") }
+    var readingTheme by remember { mutableStateOf("Light") }
+    var keepScreenOn by remember { mutableStateOf(false) }
+    
+    val activity = context as? android.app.Activity
+    DisposableEffect(keepScreenOn) {
+        if (keepScreenOn) {
+            activity?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose { activity?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
     var isOcrProcessing by remember { mutableStateOf(false) }
     var ocrExtractedText by remember { mutableStateOf("") }
 
@@ -1015,33 +1044,33 @@ fun ReaderScreen(
                                         ) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = false },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = false; isTextMode = false },
                                                     modifier = Modifier.background(
-                                                        color = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        color = if (!isEraserMode && !isHighlighterMode && !isUnderlineMode && !isTextMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
                                                     )
                                                 ) {
                                                     Icon(
                                                         Icons.Default.Brush,
                                                         contentDescription = "Pen",
-                                                        tint = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                        tint = if (!isEraserMode && !isHighlighterMode && !isUnderlineMode && !isTextMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = true },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = true; isUnderlineMode = false; isTextMode = false },
                                                     modifier = Modifier.background(
-                                                        color = if (!isEraserMode && isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        color = if (isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
                                                     )
                                                 ) {
                                                     Icon(
                                                         Icons.Default.BorderColor,
                                                         contentDescription = "Highlight",
-                                                        tint = if (!isEraserMode && isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                        tint = if (isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { isEraserMode = true; isHighlighterMode = false },
+                                                    onClick = { isEraserMode = true; isHighlighterMode = false; isUnderlineMode = false; isTextMode = false },
                                                     modifier = Modifier.background(
                                                         color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
@@ -1051,6 +1080,34 @@ fun ReaderScreen(
                                                         Icons.Default.AutoFixHigh,
                                                         contentDescription = "Eraser",
                                                         tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                // Add Underline
+                                                IconButton(
+                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = true; isTextMode = false },
+                                                    modifier = Modifier.background(
+                                                        color = if (isUnderlineMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.FormatUnderlined,
+                                                        contentDescription = "Underline",
+                                                        tint = if (isUnderlineMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                                // Add Text
+                                                IconButton(
+                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = false; isTextMode = true },
+                                                    modifier = Modifier.background(
+                                                        color = if (isTextMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        shape = CircleShape
+                                                    )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Title,
+                                                        contentDescription = "Add Text",
+                                                        tint = if (isTextMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                             }
@@ -1078,12 +1135,21 @@ fun ReaderScreen(
                                                 }
                                             }
 
-                                            IconButton(onClick = {
-                                                currentPdf?.uriString?.let { uri ->
-                                                    viewModel.undoLastStroke(uri, currentPage)
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                IconButton(onClick = {
+                                                    currentPdf?.uriString?.let { uri ->
+                                                        viewModel.undoLastStroke(uri, currentPage)
+                                                    }
+                                                }) {
+                                                    Icon(Icons.Default.Undo, contentDescription = "Undo")
                                                 }
-                                            }) {
-                                                Icon(Icons.Default.Undo, contentDescription = "Undo drawing")
+                                                IconButton(onClick = {
+                                                    currentPdf?.uriString?.let { uri ->
+                                                        viewModel.redoLastStroke(uri, currentPage)
+                                                    }
+                                                }) {
+                                                    Icon(Icons.Default.Redo, contentDescription = "Redo")
+                                                }
                                             }
                                         }
 
@@ -1105,100 +1171,78 @@ fun ReaderScreen(
                                     }
                                 }
 
-                                // Page Scrubber Slider
-                                if (pageCount > 1) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = "1",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Slider(
-                                            value = currentPage.toFloat(),
-                                            onValueChange = { viewModel.jumpToPage(it.toInt(), viewWidth) },
-                                            valueRange = 0f..(pageCount - 1).toFloat(),
-                                            steps = (pageCount - 2).coerceAtLeast(0),
-                                            colors = SliderDefaults.colors(
-                                                thumbColor = MaterialTheme.colorScheme.primary,
-                                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                                            ),
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .padding(horizontal = 12.dp)
-                                                .testTag("page_slider")
-                                        )
-                                        Text(
-                                            text = "$pageCount",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
 
-                                // Jump button
-                                Box(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    contentAlignment = Alignment.Center
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    var showJumpDialog by remember { mutableStateOf(false) }
-                                    Text(
-                                        text = "Page ${currentPage + 1} of $pageCount",
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                                            .clickable { showJumpDialog = true }
-                                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            showReadingModeMenu = true
+                                        }.padding(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.MenuBook, contentDescription = "Reading mode", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Reading mode", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
 
-                                    if (showJumpDialog) {
-                                        var jumpText by remember { mutableStateOf("") }
-                                        AlertDialog(
-                                            onDismissRequest = { showJumpDialog = false },
-                                            title = { Text("Jump to Page", fontWeight = FontWeight.Bold) },
-                                            text = {
-                                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                    Text("Enter the page number to jump to (1 to $pageCount):", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                    OutlinedTextField(
-                                                        value = jumpText,
-                                                        onValueChange = { jumpText = it.filter { char -> char.isDigit() } },
-                                                        label = { Text("Page Number") },
-                                                        singleLine = true,
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        shape = RoundedCornerShape(12.dp)
-                                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            showInfoDialog = true
+                                        }.padding(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Settings, contentDescription = "Manage", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Manage", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            isDrawingMode = !isDrawingMode
+                                            if (isDrawingMode) isFullScreen = false
+                                        }.padding(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Markup", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Markup", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            showSignDialog = true
+                                        }.padding(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Gesture, contentDescription = "Sign", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Sign", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+
+                                    val context = androidx.compose.ui.platform.LocalContext.current
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            currentPdf?.uriString?.let { uriString ->
+                                                val uri = android.net.Uri.parse(uriString)
+                                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                    type = "application/pdf"
+                                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                 }
-                                            },
-                                            confirmButton = {
-                                                Button(
-                                                    onClick = {
-                                                        val page = jumpText.toIntOrNull()
-                                                        if (page != null && page in 1..pageCount) {
-                                                            viewModel.jumpToPage(page - 1, viewWidth)
-                                                        }
-                                                        showJumpDialog = false
-                                                    },
-                                                    shape = RoundedCornerShape(12.dp)
-                                                ) {
-                                                    Text("Yes")
-                                                }
-                                            },
-                                            dismissButton = {
-                                                TextButton(onClick = { showJumpDialog = false }) {
-                                                    Text("Cancel")
-                                                }
-                                            },
-                                            shape = RoundedCornerShape(24.dp)
-                                        )
+                                                context.startActivity(android.content.Intent.createChooser(intent, "Share PDF"))
+                                            }
+                                        }.padding(8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Share", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
                                 }
                             }
@@ -1323,69 +1367,145 @@ fun ReaderScreen(
                     if (isPdfLoading) {
                         CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     } else if (pageCount > 0) {
-                        val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = currentPage)
-                        
-                        LaunchedEffect(listState) {
-                            snapshotFlow { listState.firstVisibleItemIndex }
-                                .collect { index ->
-                                    if (currentPage != index && !isPdfLoading) {
-                                        viewModel.updateCurrentPage(index)
-                                    }
-                                }
+                        val pageBackgroundColor = when (readingTheme) {
+                            "Dark" -> Color.DarkGray
+                            "AMOLED" -> Color.Black
+                            "Sepia" -> Color(0xFFF4ECD8)
+                            else -> Color.White
                         }
 
-                        androidx.compose.foundation.lazy.LazyColumn(
-                            state = listState,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(if (isTrueDarkMode) Color.Black else Color.DarkGray)
-                                .pointerInput(isDrawingMode) {
-                                    detectTapGestures(onTap = {
-                                        if (!isDrawingMode) {
-                                            isFullScreen = !isFullScreen
+                        val pageColorFilter = when (readingTheme) {
+                            "Dark", "AMOLED" -> ColorFilter.colorMatrix(invertColorMatrix)
+                            "Sepia" -> ColorFilter.colorMatrix(sepiaColorMatrix)
+                            else -> null
+                        }
+
+                        if (readingStyle == "Swipe") {
+                            val pagerState = androidx.compose.foundation.pager.rememberPagerState(
+                                initialPage = currentPage,
+                                pageCount = { pageCount }
+                            )
+
+                            LaunchedEffect(pagerState) {
+                                snapshotFlow { pagerState.currentPage }
+                                    .collect { index ->
+                                        if (currentPage != index && !isPdfLoading) {
+                                            viewModel.updateCurrentPage(index)
                                         }
-                                    })
-                                }
-                        ) {
-                            items(pageCount) { index ->
-                                Column {
-                                    PdfPageItem(
-                                        pageIndex = index,
-                                        targetWidth = viewWidth,
-                                        viewModel = viewModel,
-                                        bionicConfig = bionicConfig,
-                                        isTrueDarkMode = isTrueDarkMode,
-                                        invertColorMatrix = invertColorMatrix,
-                                        pageDrawings = pageDrawings,
-                                        currentNotes = currentNotes,
-                                        isDrawingMode = isDrawingMode,
-                                        isHighlighterMode = isHighlighterMode,
-                                        isEraserMode = isEraserMode,
-                                        selectedColor = selectedColor,
-                                        strokeWidth = strokeWidth,
-                                        currentPdf = currentPdf,
-                                        readerOnSurfaceColor = readerOnSurfaceColor,
-                                        onOpenBionicSettings = { showBionicSettingsDialog = true },
-                                        onNoteClick = { text ->
-                                            noteInputText = text
-                                            showNoteDialog = true
-                                        },
-                                        onNoteDelete = { pageIdx, text ->
-                                            val note = currentNotes.find { it.pageNumber == pageIdx }
-                                            if (note != null) {
-                                                if (text.isNotEmpty()) {
-                                                    viewModel.addOrUpdateNote(pageIdx, text)
-                                                } else {
-                                                    viewModel.removeNote(note.id)
-                                                }
+                                    }
+                            }
+                            
+                            androidx.compose.foundation.pager.HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(pageBackgroundColor)
+                                    .pointerInput(isDrawingMode) {
+                                        detectTapGestures(onTap = {
+                                            if (!isDrawingMode) {
+                                                isFullScreen = !isFullScreen
+                                            }
+                                        })
+                                    }
+                            ) { index ->
+                                PdfPageItem(
+                                    pageIndex = index,
+                                    targetWidth = viewWidth,
+                                    viewModel = viewModel,
+                                    bionicConfig = bionicConfig,
+                                    pageBackgroundColor = pageBackgroundColor,
+                                    pageColorFilter = pageColorFilter,
+                                    pageDrawings = pageDrawings,
+                                    currentNotes = currentNotes,
+                                    isDrawingMode = isDrawingMode,
+                                    isHighlighterMode = isHighlighterMode,
+                                    isEraserMode = isEraserMode,
+                                    selectedColor = selectedColor,
+                                    strokeWidth = strokeWidth,
+                                    currentPdf = currentPdf,
+                                    readerOnSurfaceColor = readerOnSurfaceColor,
+                                    onOpenBionicSettings = { showBionicSettingsDialog = true },
+                                    onNoteClick = { text ->
+                                        noteInputText = text
+                                        showNoteDialog = true
+                                    },
+                                    onNoteDelete = { pageIdx, text ->
+                                        val note = currentNotes.find { it.pageNumber == pageIdx }
+                                        if (note != null) {
+                                            if (text.isNotEmpty()) {
+                                                viewModel.addOrUpdateNote(pageIdx, text)
+                                            } else {
+                                                viewModel.removeNote(note.id)
                                             }
                                         }
-                                    )
-                                    if (index < pageCount - 1) {
-                                        androidx.compose.material3.HorizontalDivider(
-                                            thickness = 2.dp,
-                                            color = if (isTrueDarkMode) Color.DarkGray else Color.Black
+                                    }
+                                )
+                            }
+                        } else {
+                            val listState = androidx.compose.foundation.lazy.rememberLazyListState(initialFirstVisibleItemIndex = currentPage)
+                            
+                            LaunchedEffect(listState) {
+                                snapshotFlow { listState.firstVisibleItemIndex }
+                                    .collect { index ->
+                                        if (currentPage != index && !isPdfLoading) {
+                                            viewModel.updateCurrentPage(index)
+                                        }
+                                    }
+                            }
+    
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                state = listState,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(pageBackgroundColor)
+                                    .pointerInput(isDrawingMode) {
+                                        detectTapGestures(onTap = {
+                                            if (!isDrawingMode) {
+                                                isFullScreen = !isFullScreen
+                                            }
+                                        })
+                                    }
+                            ) {
+                                items(pageCount) { index ->
+                                    Column {
+                                        PdfPageItem(
+                                            pageIndex = index,
+                                            targetWidth = viewWidth,
+                                            viewModel = viewModel,
+                                            bionicConfig = bionicConfig,
+                                            pageBackgroundColor = pageBackgroundColor,
+                                            pageColorFilter = pageColorFilter,
+                                            pageDrawings = pageDrawings,
+                                            currentNotes = currentNotes,
+                                            isDrawingMode = isDrawingMode,
+                                            isHighlighterMode = isHighlighterMode,
+                                            isEraserMode = isEraserMode,
+                                            selectedColor = selectedColor,
+                                            strokeWidth = strokeWidth,
+                                            currentPdf = currentPdf,
+                                            readerOnSurfaceColor = readerOnSurfaceColor,
+                                            onOpenBionicSettings = { showBionicSettingsDialog = true },
+                                            onNoteClick = { text ->
+                                                noteInputText = text
+                                                showNoteDialog = true
+                                            },
+                                            onNoteDelete = { pageIdx, text ->
+                                                val note = currentNotes.find { it.pageNumber == pageIdx }
+                                                if (note != null) {
+                                                    if (text.isNotEmpty()) {
+                                                        viewModel.addOrUpdateNote(pageIdx, text)
+                                                    } else {
+                                                        viewModel.removeNote(note.id)
+                                                    }
+                                                }
+                                            }
                                         )
+                                        if (index < pageCount - 1) {
+                                            androidx.compose.material3.HorizontalDivider(
+                                                thickness = 2.dp,
+                                                color = if (readingTheme == "Dark" || readingTheme == "AMOLED") Color.DarkGray else Color.Black
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -1394,6 +1514,237 @@ fun ReaderScreen(
                 }
             }
         }
+    }
+
+    if (showReadingModeMenu) {
+        @OptIn(ExperimentalMaterial3Api::class)
+        ModalBottomSheet(
+            onDismissRequest = { showReadingModeMenu = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                Text("Reading Mode", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+
+                // 1. Reading Style
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Reading Style", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = readingStyle == "Scroll",
+                            onClick = { readingStyle = "Scroll" },
+                            label = { Text("Scroll") },
+                            leadingIcon = { Icon(Icons.Default.ArrowDownward, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = readingStyle == "Swipe",
+                            onClick = { readingStyle = "Swipe" },
+                            label = { Text("Swipe") },
+                            leadingIcon = { Icon(Icons.Default.ArrowForward, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
+                // 2. Theme
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Theme", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("Light", "Sepia", "Dark", "AMOLED").forEach { theme ->
+                            FilterChip(
+                                selected = readingTheme == theme,
+                                onClick = { readingTheme = theme },
+                                label = { Text(theme) }
+                            )
+                        }
+                    }
+                }
+
+                // 3. Smart Reading
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Smart Reading", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = bionicConfig.isEnabled,
+                            onClick = { showBionicSettingsDialog = true },
+                            label = { Text("Reflow (AI text)") },
+                            leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        var autoBrightness by remember { mutableStateOf(true) }
+                        FilterChip(
+                            selected = autoBrightness,
+                            onClick = { 
+                                autoBrightness = !autoBrightness 
+                                if (autoBrightness) {
+                                    activity?.window?.attributes = activity?.window?.attributes?.apply {
+                                        screenBrightness = -1f // System default (auto)
+                                    }
+                                } else {
+                                    activity?.window?.attributes = activity?.window?.attributes?.apply {
+                                        screenBrightness = 0.5f // Fixed manual fallback
+                                    }
+                                }
+                            },
+                            label = { Text("Auto Brightness") },
+                            leadingIcon = { Icon(Icons.Default.BrightnessAuto, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
+                // 4. Focus Mode
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Focus Mode", fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = isFullScreen,
+                            onClick = {
+                                isFullScreen = !isFullScreen
+                            },
+                            label = { Text("Hide UI") },
+                            leadingIcon = { Icon(Icons.Default.Fullscreen, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                        FilterChip(
+                            selected = keepScreenOn,
+                            onClick = { keepScreenOn = !keepScreenOn },
+                            label = { Text("Keep Screen On") },
+                            leadingIcon = { Icon(if (keepScreenOn) Icons.Default.Visibility else Icons.Default.VisibilityOff, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
+    }
+
+    var savedSignatures by remember { mutableStateOf(listOf<DrawingStroke>()) }
+    var tempSignature by remember { mutableStateOf<DrawingStroke?>(null) }
+
+    if (showSignDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignDialog = false; tempSignature = null },
+            title = { Text("Sign Document", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text("Draw your signature below:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .background(Color.White, RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.LightGray, RoundedCornerShape(12.dp))
+                            .pointerInput(Unit) {
+                                detectDragGestures(
+                                    onDragStart = { startOffset ->
+                                        tempSignature = DrawingStroke(
+                                            points = listOf(startOffset),
+                                            color = Color.Black,
+                                            width = 6f,
+                                            isEraser = false
+                                        )
+                                    },
+                                    onDrag = { change, _ ->
+                                        tempSignature = tempSignature?.copy(
+                                            points = tempSignature!!.points + change.position
+                                        )
+                                    },
+                                    onDragEnd = { /* Done */ },
+                                    onDragCancel = { tempSignature = null }
+                                )
+                            }
+                    ) {
+                        Canvas(modifier = Modifier.matchParentSize()) {
+                            tempSignature?.let { stroke ->
+                                if (stroke.points.size > 1) {
+                                    val path = androidx.compose.ui.graphics.Path().apply {
+                                        val points = stroke.points
+                                        moveTo(points.first().x, points.first().y)
+                                        if (points.size > 2) {
+                                            var currentX = points[0].x
+                                            var currentY = points[0].y
+                                            for (i in 1 until points.size - 1) {
+                                                val nextX = points[i].x
+                                                val nextY = points[i].y
+                                                val midX = (currentX + nextX) / 2f
+                                                val midY = (currentY + nextY) / 2f
+                                                quadraticBezierTo(currentX, currentY, midX, midY)
+                                                currentX = nextX
+                                                currentY = nextY
+                                            }
+                                            lineTo(points.last().x, points.last().y)
+                                        } else {
+                                            lineTo(points.last().x, points.last().y)
+                                        }
+                                    }
+                                    drawPath(
+                                        path = path,
+                                        color = stroke.color,
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                            width = stroke.width,
+                                            cap = StrokeCap.Round,
+                                            join = StrokeJoin.Round
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (savedSignatures.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Saved Signatures:", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        LazyColumn(modifier = Modifier.heightIn(max = 100.dp)) {
+                            items(savedSignatures) { savedSig ->
+                                Text(
+                                    text = "Signature",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            currentPdf?.uriString?.let { uri ->
+                                                viewModel.addStroke(uri, currentPage, savedSig)
+                                                showSignDialog = false
+                                            }
+                                        }
+                                        .padding(8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        tempSignature?.let { sig ->
+                            savedSignatures = savedSignatures + sig
+                            currentPdf?.uriString?.let { uri ->
+                                viewModel.addStroke(uri, currentPage, sig)
+                            }
+                        }
+                        showSignDialog = false
+                        tempSignature = null
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Save & Insert")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignDialog = false; tempSignature = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showNoteDialog) {

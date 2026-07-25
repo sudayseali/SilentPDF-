@@ -38,8 +38,8 @@ fun PdfPageItem(
     targetWidth: Int,
     viewModel: SilentPdfViewModel,
     bionicConfig: BionicConfig,
-    isTrueDarkMode: Boolean,
-    invertColorMatrix: ColorMatrix,
+    pageBackgroundColor: Color,
+    pageColorFilter: ColorFilter?,
     pageDrawings: Map<String, Map<Int, List<DrawingStroke>>>,
     currentNotes: List<NoteEntity>,
     isDrawingMode: Boolean,
@@ -94,7 +94,7 @@ fun PdfPageItem(
         Box(
             modifier = modifier
                 .fillMaxWidth()
-                .background(if (isTrueDarkMode) Color.Black else Color.White)
+                .background(pageBackgroundColor)
                 .pointerInput(isDrawingMode) {
                     if (isDrawingMode) {
                         detectDragGestures(
@@ -133,7 +133,7 @@ fun PdfPageItem(
                 Image(
                     bitmap = bitmap!!.asImageBitmap(),
                     contentDescription = "PDF Page ${pageIndex + 1}",
-                    colorFilter = if (isTrueDarkMode) ColorFilter.colorMatrix(invertColorMatrix) else null,
+                    colorFilter = pageColorFilter,
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth
                 )
@@ -145,9 +145,23 @@ fun PdfPageItem(
                     val drawStroke = { stroke: DrawingStroke ->
                         if (stroke.points.size > 1) {
                             val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(stroke.points.first().x, stroke.points.first().y)
-                                for (i in 1 until stroke.points.size) {
-                                    lineTo(stroke.points[i].x, stroke.points[i].y)
+                                val points = stroke.points
+                                moveTo(points.first().x, points.first().y)
+                                if (points.size > 2) {
+                                    var currentX = points[0].x
+                                    var currentY = points[0].y
+                                    for (i in 1 until points.size - 1) {
+                                        val nextX = points[i].x
+                                        val nextY = points[i].y
+                                        val midX = (currentX + nextX) / 2f
+                                        val midY = (currentY + nextY) / 2f
+                                        quadraticBezierTo(currentX, currentY, midX, midY)
+                                        currentX = nextX
+                                        currentY = nextY
+                                    }
+                                    lineTo(points.last().x, points.last().y)
+                                } else {
+                                    lineTo(points.last().x, points.last().y)
                                 }
                             }
                             drawPath(
