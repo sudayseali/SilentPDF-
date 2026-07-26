@@ -169,6 +169,22 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pdfSearchResults = MutableStateFlow<List<PdfTextSearcher.SearchResult>>(emptyList())
     val pdfSearchResults: StateFlow<List<PdfTextSearcher.SearchResult>> = _pdfSearchResults
 
+    private val _activeSearchMatchIndex = MutableStateFlow(0)
+    val activeSearchMatchIndex: StateFlow<Int> = _activeSearchMatchIndex
+
+    fun nextSearchMatch() {
+        if (_pdfSearchResults.value.isNotEmpty()) {
+            _activeSearchMatchIndex.value = (_activeSearchMatchIndex.value + 1) % _pdfSearchResults.value.size
+        }
+    }
+
+    fun previousSearchMatch() {
+        if (_pdfSearchResults.value.isNotEmpty()) {
+            _activeSearchMatchIndex.value = if (_activeSearchMatchIndex.value - 1 < 0) _pdfSearchResults.value.size - 1 else _activeSearchMatchIndex.value - 1
+        }
+    }
+
+
     private val _isSearchingInPdf = MutableStateFlow(false)
     val isSearchingInPdf: StateFlow<Boolean> = _isSearchingInPdf
 
@@ -664,6 +680,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     textSearcher.search(Uri.parse(pdf.uriString), query)
                 }
                 _pdfSearchResults.value = results
+                _activeSearchMatchIndex.value = 0
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
             } finally {
