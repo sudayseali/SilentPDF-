@@ -159,6 +159,10 @@ class PdfRenderEngine(private val context: Context) {
         }
     }
 
+    fun getPageCount(): Int {
+        return pdfRenderer?.pageCount ?: 0
+    }
+
     fun closeDocument() {
         synchronized(renderLock) {
             // Explicitly recycle cached bitmaps to release large native memory blocks immediately

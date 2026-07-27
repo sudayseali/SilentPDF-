@@ -227,6 +227,8 @@ fun ReaderScreen(
 
     var isFullScreen by remember { mutableStateOf(true) }
     var showInfoDialog by remember { mutableStateOf(false) }
+    var showManagePages by remember { mutableStateOf(false) }
+
     var showMoreMenu by remember { mutableStateOf(false) }
     var showVoiceRecorderDialog by remember { mutableStateOf(false) }
     var showOcrDialog by remember { mutableStateOf(false) }
@@ -1195,7 +1197,7 @@ fun ReaderScreen(
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.clickable {
-                                            showInfoDialog = true
+                                            showManagePages = true
                                         }.padding(8.dp)
                                     ) {
                                         Icon(Icons.Default.Settings, contentDescription = "Manage", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1265,6 +1267,18 @@ fun ReaderScreen(
                         },
                     contentAlignment = Alignment.Center
                 ) {
+                    if (showManagePages && currentPdf != null) {
+                        ManagePagesScreen(
+                            pdf = currentPdf!!,
+                            viewModel = viewModel,
+                            onClose = { showManagePages = false },
+                            onPagesChanged = { 
+                                viewModel.openPdf(currentPdf!!)
+                            }
+
+                        )
+                    }
+
                     if (showInfoDialog) {
                         AlertDialog(
                             onDismissRequest = { showInfoDialog = false },
