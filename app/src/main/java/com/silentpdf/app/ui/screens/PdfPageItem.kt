@@ -1,7 +1,13 @@
 package com.silentpdf.app.ui.screens
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.calculatePan
+
 
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.positionChanged
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -134,16 +140,35 @@ fun PdfPageItem(
                             }
                         )
                     } else {
-                        detectTransformGestures { _, pan, zoom, _ ->
-                            val newScale = (scale * zoom).coerceIn(1f, 5f)
-                            scale = newScale
-                            
-                            if (scale == 1f) {
-                                offset = androidx.compose.ui.geometry.Offset.Zero
-                            } else {
-                                val newOffset = offset + pan * scale
-                                offset = newOffset
-                            }
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            do {
+                                val event = awaitPointerEvent()
+                                val canceled = event.changes.any { it.isConsumed }
+                                if (!canceled) {
+                                    val zoomChange = event.calculateZoom()
+                                    val panChange = event.calculatePan()
+                                    
+                                    if (zoomChange != 1f || panChange != androidx.compose.ui.geometry.Offset.Zero) {
+                                        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+                                        scale = newScale
+                                        if (scale == 1f) {
+                                            offset = androidx.compose.ui.geometry.Offset.Zero
+                                        } else {
+                                            offset += panChange * scale
+                                        }
+                                    }
+                                    
+                                    val isMultiTouch = event.changes.size > 1
+                                    if (isMultiTouch || scale > 1f) {
+                                        event.changes.forEach {
+                                            if (it.positionChanged()) {
+                                                it.consume()
+                                            }
+                                        }
+                                    }
+                                }
+                            } while (!canceled && event.changes.any { it.pressed })
                         }
                     }
                 }
@@ -153,7 +178,7 @@ fun PdfPageItem(
                     translationX = offset.x,
                     translationY = offset.y
                 ),
-            contentAlignment = Alignment.Center
+            contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
             if (bitmap != null) {
                 Image(
@@ -162,6 +187,12 @@ fun PdfPageItem(
                     colorFilter = pageColorFilter,
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth
+                )
+                com.silentpdf.app.ui.components.TransparentHighlightOverlay(
+                    searchResults = searchInPdfResults,
+                    activeMatchIndex = activeSearchMatchIndex,
+                    pageIndex = pageIndex,
+                    modifier = Modifier.matchParentSize()
                 )
 
                 Canvas(modifier = Modifier.matchParentSize()) {
@@ -205,18 +236,6 @@ fun PdfPageItem(
 
                     strokes.forEach(drawStroke)
                     currentStroke?.let(drawStroke)
-
-                    // Draw search highlights
-                    searchInPdfResults.forEachIndexed { index, result ->
-                        if (result.pageNumber == pageIndex) {
-                            val isActive = index == activeSearchMatchIndex
-                            val highlightColor = if (isActive) Color(0x66FF9800) else Color(0x33FFEB3B)
-                            result.bounds.forEach { rect ->
-                                val highlightRect = androidx.compose.ui.geometry.Rect(rect.left * size.width, rect.top * size.height, rect.right * size.width, rect.bottom * size.height)
-                                drawRect(color = highlightColor, topLeft = highlightRect.topLeft, size = highlightRect.size)
-                            }
-                        }
-                    }
                 }
             } else {
                 CircularProgressIndicator(modifier = Modifier.padding(32.dp))

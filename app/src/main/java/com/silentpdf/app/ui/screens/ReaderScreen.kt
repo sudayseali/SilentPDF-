@@ -746,13 +746,17 @@ fun ReaderScreen(
                                                                 )
                                                             }
                                                             Spacer(modifier = Modifier.height(4.dp))
-                                                            Text(
+                                                            val matches = com.silentpdf.app.ui.components.findSearchMatches(result.snippet, searchInPdfQuery)
+                                                            com.silentpdf.app.ui.components.HighlightedText(
                                                                 text = result.snippet,
-                                                                fontSize = 12.sp,
-                                                                color = MaterialTheme.colorScheme.onSurface,
-                                                                maxLines = 2,
-                                                                overflow = TextOverflow.Ellipsis
+                                                                matches = matches,
+                                                                currentMatchIndex = -1, // No specific match is active in the snippet
+                                                                modifier = Modifier,
+                                                                activeHighlightColor = Color(0xFFFF9800),
+                                                                inactiveHighlightColor = Color(0x66FFEB3B),
+                                                                textColor = MaterialTheme.colorScheme.onSurface
                                                             )
+
                                                         }
                                                     }
                                                 }
@@ -1268,16 +1272,21 @@ fun ReaderScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (showManagePages && currentPdf != null) {
-                        ManagePagesScreen(
-                            pdf = currentPdf!!,
-                            viewModel = viewModel,
-                            onClose = { showManagePages = false },
-                            onPagesChanged = { 
-                                viewModel.openPdf(currentPdf!!)
-                            }
-
-                        )
+                        androidx.compose.ui.window.Dialog(
+                            onDismissRequest = { showManagePages = false },
+                            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+                        ) {
+                            ManagePagesScreen(
+                                pdf = currentPdf!!,
+                                viewModel = viewModel,
+                                onClose = { showManagePages = false },
+                                onPagesChanged = { 
+                                    viewModel.openPdf(currentPdf!!)
+                                }
+                            )
+                        }
                     }
+
 
                     if (showInfoDialog) {
                         AlertDialog(
@@ -1765,119 +1774,38 @@ fun ReaderScreen(
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
     
     if (showSearchOverlay) {
-        val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-        LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
-        }
-        
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f))
+                .background(Color.Transparent)
         ) {
-            // Top Bar
-            Surface(
+            com.silentpdf.app.ui.components.SearchBarWithNavigation(
+                query = searchInPdfQuery,
+                onQueryChange = { viewModel.searchInPdf(it) },
+                currentMatchIndex = activeSearchMatchIndex,
+                totalMatches = searchInPdfResults.size,
+                onPrevious = {
+                    viewModel.previousSearchMatch()
+                    if (searchInPdfResults.isNotEmpty()) {
+                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
+                    }
+                },
+                onNext = {
+                    viewModel.nextSearchMatch()
+                    if (searchInPdfResults.isNotEmpty()) {
+                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
+                    }
+                },
+                onClose = {
+                    showSearchOverlay = false
+                    viewModel.searchInPdf("")
+                },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.TopCenter),
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .statusBarsPadding(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.width(12.dp))
-                    androidx.compose.material3.TextField(
-                        value = searchInPdfQuery,
-                        onValueChange = { viewModel.searchInPdf(it) },
-                        colors = androidx.compose.material3.TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        ),
-                        placeholder = { Text("Search document...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    if (searchInPdfQuery.isNotEmpty()) {
-                        IconButton(onClick = { viewModel.searchInPdf("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    IconButton(onClick = { 
-                        showSearchOverlay = false 
-                        viewModel.searchInPdf("") // Clear search on exit
-                    }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-
-            // Bottom Bar
-            if (searchInPdfQuery.isNotEmpty()) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding(),
-                    shadowElevation = 16.dp,
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isSearchingInPdf) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("Searching...", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        } else if (searchInPdfResults.isEmpty()) {
-                            Text("No matches found", color = MaterialTheme.colorScheme.error)
-                        } else {
-                            Text(
-                                "${activeSearchMatchIndex + 1} / ${searchInPdfResults.size}",
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Row {
-                                IconButton(onClick = { 
-                                    viewModel.previousSearchMatch()
-                                    if (searchInPdfResults.isNotEmpty()) {
-                                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
-                                    }
-                                }) {
-                                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous", tint = MaterialTheme.colorScheme.primary)
-                                }
-                                IconButton(onClick = { 
-                                    viewModel.nextSearchMatch()
-                                    if (searchInPdfResults.isNotEmpty()) {
-                                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
-                                    }
-                                }) {
-                                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next", tint = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+            )
         }
-    }
-
+    
     if (showNoteDialog) {
         AlertDialog(
             onDismissRequest = { showNoteDialog = false },
@@ -2128,6 +2056,8 @@ fun ReaderScreen(
 
 }
 
+
+}
 
 @Composable
 fun VoiceNotePlayer(filePath: String, onDelete: () -> Unit) {

@@ -89,7 +89,8 @@ fun ManagePagesScreen(
         bottomBar = {
             BottomAppBar(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                contentPadding = PaddingValues(horizontal = 16.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                windowInsets = WindowInsets.navigationBars
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -232,7 +233,7 @@ fun ManagePagesScreen(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Adaptive(minSize = 120.dp),
                     contentPadding = PaddingValues(8.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {

@@ -1,0 +1,1 @@
+sed -i '1s/^/import androidx.compose.foundation.gestures.awaitEachGesture\nimport androidx.compose.foundation.gestures.awaitFirstDown\nimport androidx.compose.foundation.gestures.calculateZoom\nimport androidx.compose.foundation.gestures.calculatePan\n/' app/src/main/java/com/silentpdf/app/ui/screens/PdfPageItem.kt

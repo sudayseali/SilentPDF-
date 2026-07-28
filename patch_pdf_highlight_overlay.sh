@@ -1,0 +1,2 @@
+sed -i '233,243d' app/src/main/java/com/silentpdf/app/ui/screens/PdfPageItem.kt
+sed -i '191i \                com.silentpdf.app.ui.components.TransparentHighlightOverlay(\n                    searchResults = searchInPdfResults,\n                    activeMatchIndex = activeSearchMatchIndex,\n                    pageIndex = pageIndex,\n                    modifier = Modifier.matchParentSize()\n                )' app/src/main/java/com/silentpdf/app/ui/screens/PdfPageItem.kt

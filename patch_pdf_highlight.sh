@@ -1,0 +1,2 @@
+sed -i 's/val highlightColor = if (isActive) Color(0x66FF9800) else Color(0x33FFEB3B)/val highlightColor = if (isActive) Color(0xAAFF9800) else Color(0x88FFEB3B)/g' app/src/main/java/com/silentpdf/app/ui/screens/PdfPageItem.kt
+sed -i 's/drawRect(color = highlightColor, topLeft = highlightRect.topLeft, size = highlightRect.size)/drawRect(color = highlightColor, topLeft = highlightRect.topLeft, size = highlightRect.size, blendMode = androidx.compose.ui.graphics.BlendMode.Multiply)/g' app/src/main/java/com/silentpdf/app/ui/screens/PdfPageItem.kt
