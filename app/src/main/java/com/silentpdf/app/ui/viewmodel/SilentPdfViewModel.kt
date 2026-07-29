@@ -39,7 +39,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository = PdfRepository(application, database.pdfDao())
     private val securityPrefs = application.getSharedPreferences("app_security_prefs", android.content.Context.MODE_PRIVATE)
     private val renderEngine = PdfRenderEngine(application)
-    private val textSearcher = PdfTextSearcher(application)
+    val textSearcher = PdfTextSearcher(application)
 
     // State: User Search Query for Library list
     private val _searchQuery = MutableStateFlow("")
@@ -169,18 +169,41 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pdfSearchResults = MutableStateFlow<List<PdfTextSearcher.SearchResult>>(emptyList())
     val pdfSearchResults: StateFlow<List<PdfTextSearcher.SearchResult>> = _pdfSearchResults
 
+    private val _allMatches = MutableStateFlow<List<PdfTextSearcher.Match>>(emptyList())
+    val allMatches: StateFlow<List<PdfTextSearcher.Match>> = _allMatches
+
     private val _activeSearchMatchIndex = MutableStateFlow(0)
     val activeSearchMatchIndex: StateFlow<Int> = _activeSearchMatchIndex
 
     fun nextSearchMatch() {
-        if (_pdfSearchResults.value.isNotEmpty()) {
+        val matches = _allMatches.value
+        if (matches.isNotEmpty()) {
+            val nextIdx = (_activeSearchMatchIndex.value + 1) % matches.size
+            _activeSearchMatchIndex.value = nextIdx
+            _currentPage.value = matches[nextIdx].page
+        } else if (_pdfSearchResults.value.isNotEmpty()) {
             _activeSearchMatchIndex.value = (_activeSearchMatchIndex.value + 1) % _pdfSearchResults.value.size
         }
     }
 
     fun previousSearchMatch() {
-        if (_pdfSearchResults.value.isNotEmpty()) {
+        val matches = _allMatches.value
+        if (matches.isNotEmpty()) {
+            val prevIdx = if (_activeSearchMatchIndex.value - 1 < 0) matches.size - 1 else _activeSearchMatchIndex.value - 1
+            _activeSearchMatchIndex.value = prevIdx
+            _currentPage.value = matches[prevIdx].page
+        } else if (_pdfSearchResults.value.isNotEmpty()) {
             _activeSearchMatchIndex.value = if (_activeSearchMatchIndex.value - 1 < 0) _pdfSearchResults.value.size - 1 else _activeSearchMatchIndex.value - 1
+        }
+    }
+
+    fun setActiveSearchMatch(index: Int) {
+        val matches = _allMatches.value
+        if (index in matches.indices) {
+            _activeSearchMatchIndex.value = index
+            _currentPage.value = matches[index].page
+        } else if (index in _pdfSearchResults.value.indices) {
+            _activeSearchMatchIndex.value = index
         }
     }
 
@@ -571,7 +594,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 // Dynamically fetch outline/table of contents on a background thread
                 extractPdfOutline()
                 
-                // Cache plain text pages for AI capabilities deferred to prevent OOM
+                // Cache plain text pages for AI capabilities and high-speed search
+                cachePdfText(Uri.parse(pdf.uriString))
             } catch (e: SecurityException) {
                 Log.e("SilentPdfViewModel", "Encrypted PDF file requiring password", e)
                 _isPasswordProtected.value = true
@@ -599,6 +623,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         _pdfOpeningError.value = null
         _pdfSearchQuery.value = ""
         _pdfSearchResults.value = emptyList()
+        _allMatches.value = emptyList()
+        _activeSearchMatchIndex.value = 0
         _pdfOutline.value = emptyList()
         _openedPdfTextPages.value = emptyList()
     }
@@ -669,18 +695,37 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             if (query.isBlank()) {
                 _pdfSearchResults.value = emptyList()
+                _allMatches.value = emptyList()
+                _activeSearchMatchIndex.value = 0
                 return@launch
             }
             _isSearchingInPdf.value = true
             try {
+                val uri = Uri.parse(pdf.uriString)
+                val matches = textSearcher.searchMatches(
+                    uri = uri,
+                    query = query,
+                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                )
+                _allMatches.value = matches
+
                 val cached = _openedPdfTextPages.value
-                val results = if (cached.isNotEmpty()) {
+                var results = if (cached.isNotEmpty()) {
                     textSearcher.searchCached(cached, query)
-                } else {
-                    textSearcher.search(Uri.parse(pdf.uriString), query)
+                } else emptyList()
+
+                if (results.isEmpty()) {
+                    results = textSearcher.search(
+                        uri = uri,
+                        query = query,
+                        bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                    )
                 }
                 _pdfSearchResults.value = results
                 _activeSearchMatchIndex.value = 0
+                if (matches.isNotEmpty()) {
+                    _currentPage.value = matches[0].page
+                }
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
             } finally {
@@ -727,7 +772,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private fun cachePdfText(uri: Uri) {
         viewModelScope.launch {
             try {
-                _openedPdfTextPages.value = textSearcher.getPagesText(uri)
+                _openedPdfTextPages.value = textSearcher.getPagesText(
+                    uri = uri,
+                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                )
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to cache PDF text pages", e)
             }

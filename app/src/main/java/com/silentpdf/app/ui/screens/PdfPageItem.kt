@@ -66,7 +66,29 @@ fun PdfPageItem(
     var currentStroke by remember { mutableStateOf<DrawingStroke?>(null) }
 
     val searchInPdfResults by viewModel.pdfSearchResults.collectAsState()
+    val allMatches by viewModel.allMatches.collectAsState()
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
+    val searchQuery by viewModel.pdfSearchQuery.collectAsState()
+    var lazyBounds by remember(pageIndex, searchQuery) { mutableStateOf<List<android.graphics.RectF>>(emptyList()) }
+
+    LaunchedEffect(pageIndex, searchQuery, searchInPdfResults, bitmap) {
+        if (searchQuery.isNotBlank() && searchInPdfResults.any { it.pageNumber == pageIndex }) {
+            val pdfUri = currentPdf?.uriString?.let { android.net.Uri.parse(it) }
+            if (pdfUri != null) {
+                launch(Dispatchers.IO) {
+                    val bounds = viewModel.textSearcher.getPageSearchBounds(
+                        uri = pdfUri,
+                        pageIndex = pageIndex,
+                        query = searchQuery,
+                        pageBitmap = bitmap
+                    )
+                    lazyBounds = bounds
+                }
+            }
+        } else {
+            lazyBounds = emptyList()
+        }
+    }
 
     LaunchedEffect(pageIndex, targetWidth) {
         if (targetWidth > 0) {
@@ -188,8 +210,19 @@ fun PdfPageItem(
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth
                 )
+                
+                val currentResult = searchInPdfResults.find { it.pageNumber == pageIndex }
+                val displayBounds = if (currentResult != null && currentResult.bounds.isNotEmpty()) {
+                    currentResult.bounds
+                } else {
+                    lazyBounds
+                }
+
                 com.silentpdf.app.ui.components.TransparentHighlightOverlay(
-                    searchResults = searchInPdfResults,
+                    matches = allMatches,
+                    searchResults = if (allMatches.isEmpty() && displayBounds.isNotEmpty()) {
+                        listOf(com.silentpdf.app.data.repository.PdfTextSearcher.SearchResult(pageIndex, "", 1, displayBounds))
+                    } else emptyList(),
                     activeMatchIndex = activeSearchMatchIndex,
                     pageIndex = pageIndex,
                     modifier = Modifier.matchParentSize()

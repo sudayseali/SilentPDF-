@@ -175,6 +175,8 @@ fun ReaderScreen(
     // Text search flows
     val searchInPdfQuery by viewModel.pdfSearchQuery.collectAsState()
     val searchInPdfResults by viewModel.pdfSearchResults.collectAsState()
+    val allMatches by viewModel.allMatches.collectAsState()
+    val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
     val isSearchingInPdf by viewModel.isSearchingInPdf.collectAsState()
 
     // Outline flows
@@ -714,49 +716,57 @@ fun ReaderScreen(
                                                 modifier = Modifier.fillMaxSize(),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                items(searchInPdfResults) { result ->
+                                                items(searchInPdfResults.size) { index ->
+                                                    val result = searchInPdfResults[index]
                                                     Card(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .clickable {
+                                                                viewModel.setActiveSearchMatch(index)
                                                                 viewModel.jumpToPage(result.pageNumber, viewWidth)
                                                                 coroutineScope.launch { drawerState.close() }
                                                             },
                                                         colors = CardDefaults.cardColors(
-                                                            containerColor = if (currentPage == result.pageNumber) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
+                                                            containerColor = if (activeSearchMatchIndex == index) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.15f)
                                                         ),
                                                         shape = RoundedCornerShape(12.dp)
                                                     ) {
-                                                        Column(modifier = Modifier.padding(10.dp)) {
+                                                        Column(modifier = Modifier.padding(12.dp)) {
                                                             Row(
                                                                 modifier = Modifier.fillMaxWidth(),
                                                                 horizontalArrangement = Arrangement.SpaceBetween,
                                                                 verticalAlignment = Alignment.CenterVertically
                                                             ) {
+                                                                Surface(
+                                                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                                                    shape = RoundedCornerShape(4.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "Page ${result.pageNumber + 1}",
+                                                                        fontSize = 11.sp,
+                                                                        fontWeight = FontWeight.ExtraBold,
+                                                                        color = MaterialTheme.colorScheme.primary,
+                                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                                    )
+                                                                }
                                                                 Text(
-                                                                    text = "Page ${result.pageNumber + 1}",
-                                                                    fontSize = 11.sp,
-                                                                    fontWeight = FontWeight.Bold,
-                                                                    color = MaterialTheme.colorScheme.primary
-                                                                )
-                                                                Text(
-                                                                    text = "${result.occurrencesCount} times",
-                                                                    fontSize = 9.sp,
+                                                                    text = "${result.occurrencesCount} ${if (result.occurrencesCount == 1) "match" else "matches"}",
+                                                                    fontSize = 10.sp,
+                                                                    fontWeight = FontWeight.Medium,
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                 )
                                                             }
-                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Spacer(modifier = Modifier.height(8.dp))
                                                             val matches = com.silentpdf.app.ui.components.findSearchMatches(result.snippet, searchInPdfQuery)
                                                             com.silentpdf.app.ui.components.HighlightedText(
                                                                 text = result.snippet,
                                                                 matches = matches,
-                                                                currentMatchIndex = -1, // No specific match is active in the snippet
-                                                                modifier = Modifier,
+                                                                currentMatchIndex = -1,
+                                                                modifier = Modifier.fillMaxWidth(),
                                                                 activeHighlightColor = Color(0xFFFF9800),
-                                                                inactiveHighlightColor = Color(0x66FFEB3B),
+                                                                inactiveHighlightColor = Color(0xFFFFF176).copy(alpha = 0.6f),
                                                                 textColor = MaterialTheme.colorScheme.onSurface
                                                             )
-
                                                         }
                                                     }
                                                 }
@@ -1418,6 +1428,12 @@ fun ReaderScreen(
                                         }
                                     }
                             }
+
+                            LaunchedEffect(currentPage, activeSearchMatchIndex) {
+                                if (pagerState.currentPage != currentPage && currentPage in 0 until pageCount) {
+                                    pagerState.animateScrollToPage(currentPage)
+                                }
+                            }
                             
                             androidx.compose.foundation.pager.HorizontalPager(
                                 state = pagerState,
@@ -1475,6 +1491,30 @@ fun ReaderScreen(
                                             viewModel.updateCurrentPage(index)
                                         }
                                     }
+                            }
+
+                            LaunchedEffect(activeSearchMatchIndex, allMatches) {
+                                if (allMatches.isNotEmpty() && activeSearchMatchIndex in allMatches.indices) {
+                                    val match = allMatches[activeSearchMatchIndex]
+                                    val targetPage = match.page
+                                    val rectTop = match.rect.top
+                                    val estimatedPageHeight = viewWidth * 1.414f
+                                    val targetOffset = ((rectTop * estimatedPageHeight) - 150f).coerceAtLeast(0f).toInt()
+                                    listState.animateScrollToItem(
+                                        index = targetPage,
+                                        scrollOffset = targetOffset
+                                    )
+                                }
+                            }
+
+                            LaunchedEffect(currentPage) {
+                                // If the user selected a page (e.g. from outline) and it's not currently visible
+                                if (listState.firstVisibleItemIndex != currentPage && currentPage in 0 until pageCount) {
+                                    // Only scroll if we are not actively tracking a search match that just changed the page
+                                    if (allMatches.isEmpty() || allMatches.getOrNull(activeSearchMatchIndex)?.page != currentPage) {
+                                        listState.animateScrollToItem(currentPage)
+                                    }
+                                }
                             }
     
                             androidx.compose.foundation.lazy.LazyColumn(
@@ -1771,8 +1811,6 @@ fun ReaderScreen(
         )
     }
 
-    val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
-    
     if (showSearchOverlay) {
         Box(
             modifier = Modifier
@@ -1783,19 +1821,9 @@ fun ReaderScreen(
                 query = searchInPdfQuery,
                 onQueryChange = { viewModel.searchInPdf(it) },
                 currentMatchIndex = activeSearchMatchIndex,
-                totalMatches = searchInPdfResults.size,
-                onPrevious = {
-                    viewModel.previousSearchMatch()
-                    if (searchInPdfResults.isNotEmpty()) {
-                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
-                    }
-                },
-                onNext = {
-                    viewModel.nextSearchMatch()
-                    if (searchInPdfResults.isNotEmpty()) {
-                        viewModel.jumpToPage(searchInPdfResults[viewModel.activeSearchMatchIndex.value].pageNumber)
-                    }
-                },
+                totalMatches = if (allMatches.isNotEmpty()) allMatches.size else searchInPdfResults.size,
+                onPrevious = { viewModel.previousSearchMatch() },
+                onNext = { viewModel.nextSearchMatch() },
                 onClose = {
                     showSearchOverlay = false
                     viewModel.searchInPdf("")
