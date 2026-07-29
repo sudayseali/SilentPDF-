@@ -1061,20 +1061,20 @@ fun ReaderScreen(
                                         ) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                                 IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = false; isTextMode = false },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = false },
                                                     modifier = Modifier.background(
-                                                        color = if (!isEraserMode && !isHighlighterMode && !isUnderlineMode && !isTextMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                                        color = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
                                                     )
                                                 ) {
                                                     Icon(
-                                                        Icons.Default.Brush,
+                                                        Icons.Default.Edit,
                                                         contentDescription = "Pen",
-                                                        tint = if (!isEraserMode && !isHighlighterMode && !isUnderlineMode && !isTextMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                                        tint = if (!isEraserMode && !isHighlighterMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = true; isUnderlineMode = false; isTextMode = false },
+                                                    onClick = { isEraserMode = false; isHighlighterMode = true },
                                                     modifier = Modifier.background(
                                                         color = if (isHighlighterMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
@@ -1087,7 +1087,7 @@ fun ReaderScreen(
                                                     )
                                                 }
                                                 IconButton(
-                                                    onClick = { isEraserMode = true; isHighlighterMode = false; isUnderlineMode = false; isTextMode = false },
+                                                    onClick = { isEraserMode = true; isHighlighterMode = false },
                                                     modifier = Modifier.background(
                                                         color = if (isEraserMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                                         shape = CircleShape
@@ -1097,34 +1097,6 @@ fun ReaderScreen(
                                                         Icons.Default.AutoFixHigh,
                                                         contentDescription = "Eraser",
                                                         tint = if (isEraserMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                }
-                                                // Add Underline
-                                                IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = true; isTextMode = false },
-                                                    modifier = Modifier.background(
-                                                        color = if (isUnderlineMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                                        shape = CircleShape
-                                                    )
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.FormatUnderlined,
-                                                        contentDescription = "Underline",
-                                                        tint = if (isUnderlineMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                }
-                                                // Add Text
-                                                IconButton(
-                                                    onClick = { isEraserMode = false; isHighlighterMode = false; isUnderlineMode = false; isTextMode = true },
-                                                    modifier = Modifier.background(
-                                                        color = if (isTextMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                                        shape = CircleShape
-                                                    )
-                                                ) {
-                                                    Icon(
-                                                        Icons.Default.Title,
-                                                        contentDescription = "Add Text",
-                                                        tint = if (isTextMode) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
                                                     )
                                                 }
                                             }

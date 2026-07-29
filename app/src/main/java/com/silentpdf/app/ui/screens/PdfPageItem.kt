@@ -132,36 +132,7 @@ fun PdfPageItem(
                 .fillMaxWidth()
                 .background(pageBackgroundColor)
                 .pointerInput(isDrawingMode) {
-                    if (isDrawingMode) {
-                        detectDragGestures(
-                            onDragStart = { startOffset ->
-                                currentStroke = DrawingStroke(
-                                    points = listOf(startOffset),
-                                    color = if (isHighlighterMode) selectedColor.copy(alpha = 0.4f) else selectedColor,
-                                    width = strokeWidth,
-                                    isEraser = isEraserMode
-                                )
-                            },
-                            onDrag = { change, _ ->
-                                currentStroke = currentStroke?.copy(
-                                    points = currentStroke!!.points + change.position
-                                )
-                            },
-                            onDragEnd = {
-                                currentStroke?.let { stroke ->
-                                    if (stroke.points.size > 1) {
-                                        currentPdf?.uriString?.let { uri ->
-                                            viewModel.addStroke(uri, pageIndex, stroke)
-                                        }
-                                    }
-                                }
-                                currentStroke = null
-                            },
-                            onDragCancel = {
-                                currentStroke = null
-                            }
-                        )
-                    } else {
+                    if (!isDrawingMode) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
                             do {
@@ -199,7 +170,39 @@ fun PdfPageItem(
                     scaleY = scale,
                     translationX = offset.x,
                     translationY = offset.y
-                ),
+                )
+                .pointerInput(isDrawingMode) {
+                    if (isDrawingMode) {
+                        detectDragGestures(
+                            onDragStart = { startOffset ->
+                                currentStroke = DrawingStroke(
+                                    points = listOf(startOffset),
+                                    color = if (isHighlighterMode) selectedColor.copy(alpha = 0.4f) else selectedColor,
+                                    width = strokeWidth,
+                                    isEraser = isEraserMode
+                                )
+                            },
+                            onDrag = { change, _ ->
+                                currentStroke = currentStroke?.copy(
+                                    points = currentStroke!!.points + change.position
+                                )
+                            },
+                            onDragEnd = {
+                                currentStroke?.let { stroke ->
+                                    if (stroke.points.size > 1) {
+                                        currentPdf?.uriString?.let { uri ->
+                                            viewModel.addStroke(uri, pageIndex, stroke)
+                                        }
+                                    }
+                                }
+                                currentStroke = null
+                            },
+                            onDragCancel = {
+                                currentStroke = null
+                            }
+                        )
+                    }
+                },
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
             if (bitmap != null) {
@@ -228,7 +231,9 @@ fun PdfPageItem(
                     modifier = Modifier.matchParentSize()
                 )
 
-                Canvas(modifier = Modifier.matchParentSize()) {
+                Canvas(modifier = Modifier.matchParentSize().graphicsLayer {
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                }) {
                     val pdfUri = currentPdf?.uriString ?: return@Canvas
                     val strokes = pageDrawings[pdfUri]?.get(pageIndex) ?: emptyList()
                     
@@ -262,7 +267,9 @@ fun PdfPageItem(
                                     cap = StrokeCap.Round,
                                     join = StrokeJoin.Round
                                 ),
-                                blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear else androidx.compose.ui.graphics.BlendMode.SrcOver
+                                blendMode = if (stroke.isEraser) androidx.compose.ui.graphics.BlendMode.Clear 
+                                else if (stroke.color.alpha < 1f) androidx.compose.ui.graphics.BlendMode.Multiply 
+                                else androidx.compose.ui.graphics.BlendMode.SrcOver
                             )
                         }
                     }
