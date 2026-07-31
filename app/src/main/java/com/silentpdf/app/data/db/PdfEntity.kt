@@ -33,3 +33,13 @@ data class NoteEntity(
     val noteText: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "ocr_results")
+data class OcrResultEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val pdfUriString: String,
+    val pageNumber: Int,
+    val recognizedText: String,
+    val boundingBoxesJson: String,
+    val timestamp: Long = System.currentTimeMillis()
+)

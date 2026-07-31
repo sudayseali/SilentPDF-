@@ -69,4 +69,11 @@ interface SilentPdfDao {
 
     @Query("DELETE FROM notes WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber")
     suspend fun deleteNoteForPage(pdfUriString: String, pageNumber: Int)
+    
+    // OCR Results
+    @Query("SELECT * FROM ocr_results WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber LIMIT 1")
+    suspend fun getOcrResult(pdfUriString: String, pageNumber: Int): OcrResultEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOcrResult(ocrResult: OcrResultEntity)
 }

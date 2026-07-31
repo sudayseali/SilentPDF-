@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.animation.core.*
@@ -174,8 +175,7 @@ fun ReaderScreen(
 
     // Text search flows
     val searchInPdfQuery by viewModel.pdfSearchQuery.collectAsState()
-    val searchInPdfResults by viewModel.pdfSearchResults.collectAsState()
-    val allMatches by viewModel.allMatches.collectAsState()
+    val searchResults by viewModel.pdfSearchResults.collectAsState()
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
     val isSearchingInPdf by viewModel.isSearchingInPdf.collectAsState()
 
@@ -694,7 +694,7 @@ fun ReaderScreen(
                                                     textAlign = TextAlign.Center
                                                 )
                                             }
-                                        } else if (searchInPdfResults.isEmpty()) {
+                                        } else if (searchResults.isEmpty()) {
                                             Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
                                                 Text(
                                                     text = "No results found.",
@@ -706,7 +706,7 @@ fun ReaderScreen(
                                             }
                                         } else {
                                             Text(
-                                                text = "Found in ${searchInPdfResults.size} places",
+                                                text = "Found in ${searchResults.size} places",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.primary,
@@ -716,14 +716,14 @@ fun ReaderScreen(
                                                 modifier = Modifier.fillMaxSize(),
                                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                                             ) {
-                                                items(searchInPdfResults.size) { index ->
-                                                    val result = searchInPdfResults[index]
+                                                items(searchResults.size) { index ->
+                                                    val result = searchResults[index]
                                                     Card(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .clickable {
                                                                 viewModel.setActiveSearchMatch(index)
-                                                                viewModel.jumpToPage(result.pageNumber, viewWidth)
+                                                                viewModel.jumpToPage(result.page, viewWidth)
                                                                 coroutineScope.launch { drawerState.close() }
                                                             },
                                                         colors = CardDefaults.cardColors(
@@ -742,7 +742,7 @@ fun ReaderScreen(
                                                                     shape = RoundedCornerShape(4.dp)
                                                                 ) {
                                                                     Text(
-                                                                        text = "Page ${result.pageNumber + 1}",
+                                                                        text = "Page ${result.page + 1}",
                                                                         fontSize = 11.sp,
                                                                         fontWeight = FontWeight.ExtraBold,
                                                                         color = MaterialTheme.colorScheme.primary,
@@ -750,16 +750,16 @@ fun ReaderScreen(
                                                                     )
                                                                 }
                                                                 Text(
-                                                                    text = "${result.occurrencesCount} ${if (result.occurrencesCount == 1) "match" else "matches"}",
+                                                                    text = "Match",
                                                                     fontSize = 10.sp,
                                                                     fontWeight = FontWeight.Medium,
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                                                 )
                                                             }
                                                             Spacer(modifier = Modifier.height(8.dp))
-                                                            val matches = com.silentpdf.app.ui.components.findSearchMatches(result.snippet, searchInPdfQuery)
+                                                            val matches = com.silentpdf.app.ui.components.findSearchMatches(result.matchText, searchInPdfQuery)
                                                             com.silentpdf.app.ui.components.HighlightedText(
-                                                                text = result.snippet,
+                                                                text = result.matchText,
                                                                 matches = matches,
                                                                 currentMatchIndex = -1,
                                                                 modifier = Modifier.fillMaxWidth(),
@@ -1191,12 +1191,13 @@ fun ReaderScreen(
                                         Text("Manage", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
 
+                                    val isMarkupEnabled = !bionicConfig.isEnabled
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.clickable {
+                                        modifier = Modifier.clickable(enabled = isMarkupEnabled) {
                                             isDrawingMode = !isDrawingMode
                                             if (isDrawingMode) isFullScreen = false
-                                        }.padding(8.dp)
+                                        }.padding(8.dp).alpha(if (isMarkupEnabled) 1f else 0.5f)
                                     ) {
                                         Icon(Icons.Default.Edit, contentDescription = "Markup", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Spacer(modifier = Modifier.height(4.dp))
@@ -1205,9 +1206,9 @@ fun ReaderScreen(
 
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier.clickable {
+                                        modifier = Modifier.clickable(enabled = isMarkupEnabled) {
                                             showSignDialog = true
-                                        }.padding(8.dp)
+                                        }.padding(8.dp).alpha(if (isMarkupEnabled) 1f else 0.5f)
                                     ) {
                                         Icon(Icons.Default.Gesture, contentDescription = "Sign", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                         Spacer(modifier = Modifier.height(4.dp))
@@ -1465,11 +1466,11 @@ fun ReaderScreen(
                                     }
                             }
 
-                            LaunchedEffect(activeSearchMatchIndex, allMatches) {
-                                if (allMatches.isNotEmpty() && activeSearchMatchIndex in allMatches.indices) {
-                                    val match = allMatches[activeSearchMatchIndex]
+                            LaunchedEffect(activeSearchMatchIndex, searchResults) {
+                                if (searchResults.isNotEmpty() && activeSearchMatchIndex in searchResults.indices) {
+                                    val match = searchResults[activeSearchMatchIndex]
                                     val targetPage = match.page
-                                    val rectTop = match.rect.top
+                                    val rectTop = match.rects.firstOrNull()?.top ?: 0f
                                     val estimatedPageHeight = viewWidth * 1.414f
                                     val targetOffset = ((rectTop * estimatedPageHeight) - 150f).coerceAtLeast(0f).toInt()
                                     listState.animateScrollToItem(
@@ -1483,7 +1484,7 @@ fun ReaderScreen(
                                 // If the user selected a page (e.g. from outline) and it's not currently visible
                                 if (listState.firstVisibleItemIndex != currentPage && currentPage in 0 until pageCount) {
                                     // Only scroll if we are not actively tracking a search match that just changed the page
-                                    if (allMatches.isEmpty() || allMatches.getOrNull(activeSearchMatchIndex)?.page != currentPage) {
+                                    if (searchResults.isEmpty() || searchResults.getOrNull(activeSearchMatchIndex)?.page != currentPage) {
                                         listState.animateScrollToItem(currentPage)
                                     }
                                 }
@@ -1793,7 +1794,7 @@ fun ReaderScreen(
                 query = searchInPdfQuery,
                 onQueryChange = { viewModel.searchInPdf(it) },
                 currentMatchIndex = activeSearchMatchIndex,
-                totalMatches = if (allMatches.isNotEmpty()) allMatches.size else searchInPdfResults.size,
+                totalMatches = searchResults.size,
                 onPrevious = { viewModel.previousSearchMatch() },
                 onNext = { viewModel.nextSearchMatch() },
                 onClose = {
