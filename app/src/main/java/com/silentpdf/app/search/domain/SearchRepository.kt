@@ -55,8 +55,7 @@ class SearchRepository(
             var words = textRes.words
             // If no text and OCR is explicitly requested, try OCR fallback
             if (words.isEmpty() && useOcr) {
-                val bitmap = bitmapProvider?.invoke(i)
-                words = ocrEngine.extractFromBitmap(uriString, i, bitmap)
+                words = ocrEngine.extractFromBitmap(uriString, i) { bitmapProvider.invoke(i) }
             }
             
             if (words.isNotEmpty()) {

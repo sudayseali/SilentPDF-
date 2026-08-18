@@ -197,10 +197,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     pageIndex = _currentPage.value,
                     bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    Log.e("SilentPdfViewModel", "Failed to OCR current page", e)
-                }
+                Log.e("SilentPdfViewModel", "Failed to OCR current page", e)
             }
         }
     }
@@ -222,10 +222,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     pageIndex = null,
                     bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    Log.e("SilentPdfViewModel", "Failed to OCR entire document", e)
-                }
+                Log.e("SilentPdfViewModel", "Failed to OCR entire document", e)
             }
         }
     }
@@ -560,6 +560,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             _isScanning.value = true
             try {
                 repository.scanLocalPdfs()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to scan local pdf documents", e)
             } finally {
@@ -659,6 +661,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 _pageCount.value = 0
                 _currentPage.value = 0
                 _currentPageBitmap.value = null
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to load PDF doc in engine", e)
                 _pdfOpeningError.value = "Could not open this book: ${e.localizedMessage}"
@@ -770,10 +774,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 if (firstMatchPage != null) {
                     _currentPage.value = firstMatchPage
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
-                }
+                Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
             }
         }
     }
@@ -798,6 +802,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val outline = textSearcher.extractOutline(Uri.parse(pdf.uriString))
                 _pdfOutline.value = outline
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed outline extraction inside active PDF", e)
             } finally {
@@ -814,6 +820,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 if (_currentPdf.value?.uriString == pdf.uriString) {
                     closePdf()
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to delete PDF", e)
             }
@@ -830,6 +838,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     uri = uri,
                     bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("SilentPdfViewModel", "Failed to cache PDF text pages", e)
             }

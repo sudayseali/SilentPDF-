@@ -165,17 +165,8 @@ class PdfRenderEngine(private val context: Context) {
 
     fun closeDocument() {
         synchronized(renderLock) {
-            // Explicitly recycle cached bitmaps to release large native memory blocks immediately
-            try {
-                val snapshot = bitmapCache.snapshot()
-                for (bitmap in snapshot.values) {
-                    if (bitmap != null && !bitmap.isRecycled) {
-                        bitmap.recycle()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("PdfRenderEngine", "Error recycling cached bitmaps", e)
-            }
+            // Let the GC handle native memory. Recycling here causes "Canvas: trying to use a recycled bitmap"
+            // if Compose or ML Kit are currently holding references during a PDF close.
             bitmapCache.evictAll()
     
             try {

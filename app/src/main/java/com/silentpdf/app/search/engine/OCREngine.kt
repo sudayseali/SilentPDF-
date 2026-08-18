@@ -19,14 +19,15 @@ import kotlin.math.min
 class OCREngine(private val dao: SilentPdfDao) {
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-    suspend fun extractFromBitmap(pdfUriString: String, pageIndex: Int, bitmap: Bitmap?): List<Pair<String, RectF>> = withContext(Dispatchers.IO) {
-        if (bitmap == null) return@withContext emptyList()
-
-        // Check DB Cache first
+    suspend fun extractFromBitmap(pdfUriString: String, pageIndex: Int, bitmapProvider: suspend () -> Bitmap?): List<Pair<String, RectF>> = withContext(Dispatchers.IO) {
+        // Check DB Cache first to avoid expensive bitmap rendering
         val cached = dao.getOcrResult(pdfUriString, pageIndex)
         if (cached != null) {
             return@withContext parseJsonBounds(cached.boundingBoxesJson)
         }
+
+        val bitmap = bitmapProvider()
+        if (bitmap == null) return@withContext emptyList()
 
         // Run ML Kit OCR
         val image = InputImage.fromBitmap(bitmap, 0)

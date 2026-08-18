@@ -87,5 +87,8 @@ class SearchUseCase(private val repository: SearchRepository) {
     fun clearSearch() {
         _searchResults.value = emptyList()
         _activeMatchIndex.value = 0
+        _isOcrRequired.value = false
+        _searchProgress.value = 0f
+        _isSearching.value = false
     }
 }

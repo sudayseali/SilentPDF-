@@ -718,6 +718,10 @@ fun ReaderScreen(
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.primary
                                                         )
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        TextButton(onClick = { viewModel.searchInPdf("") }) {
+                                                            Text("Cancel Scan")
+                                                        }
                                                     }
                                                 }
                                             }
