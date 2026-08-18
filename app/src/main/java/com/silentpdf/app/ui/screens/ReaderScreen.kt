@@ -178,6 +178,7 @@ fun ReaderScreen(
     val searchResults by viewModel.pdfSearchResults.collectAsState()
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
     val isSearchingInPdf by viewModel.isSearchingInPdf.collectAsState()
+    val isOcrEnabled by viewModel.isOcrEnabled.collectAsState()
 
     // Outline flows
     val pdfOutline by viewModel.pdfOutline.collectAsState()
@@ -680,6 +681,25 @@ fun ReaderScreen(
                                                 unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                                             )
                                         )
+                                        
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                "Scan document for text (OCR)",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Switch(
+                                                checked = isOcrEnabled,
+                                                onCheckedChange = { viewModel.toggleOcrEnabled() },
+                                                modifier = Modifier.scale(0.7f)
+                                            )
+                                        }
 
                                         if (isSearchingInPdf) {
                                             Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -1451,7 +1471,9 @@ fun ReaderScreen(
                                                 viewModel.removeNote(note.id)
                                             }
                                         }
-                                    }
+                                    },
+                                    scale = scale,
+                                    offset = offset
                                 )
                             }
                         } else {
@@ -1535,7 +1557,9 @@ fun ReaderScreen(
                                                         viewModel.removeNote(note.id)
                                                     }
                                                 }
-                                            }
+                                            },
+                                            scale = scale,
+                                            offset = offset
                                         )
                                         if (index < pageCount - 1) {
                                             androidx.compose.material3.HorizontalDivider(

@@ -60,6 +60,8 @@ fun PdfPageItem(
     onOpenBionicSettings: () -> Unit,
     onNoteClick: (String) -> Unit,
     onNoteDelete: (Int, String) -> Unit,
+    scale: Float = 1f,
+    offset: androidx.compose.ui.geometry.Offset = androidx.compose.ui.geometry.Offset.Zero,
     modifier: Modifier = Modifier
 ) {
     var bitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -197,6 +199,9 @@ fun PdfPageItem(
                     searchResults = searchResults,
                     activeMatchIndex = activeSearchMatchIndex,
                     pageIndex = pageIndex,
+                    zoom = scale,
+                    offsetX = offset.x,
+                    offsetY = offset.y,
                     modifier = Modifier.matchParentSize()
                 )
 

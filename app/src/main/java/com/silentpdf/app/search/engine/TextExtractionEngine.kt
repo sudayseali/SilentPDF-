@@ -6,6 +6,7 @@ import android.net.Uri
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
@@ -42,6 +43,8 @@ class TextExtractionEngine(private val context: Context) {
                 result = PageTextResult(words.isNotEmpty(), words)
                 document.close()
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
         }

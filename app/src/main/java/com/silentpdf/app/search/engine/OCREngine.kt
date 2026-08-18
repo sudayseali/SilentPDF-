@@ -7,6 +7,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.silentpdf.app.data.db.OcrResultEntity
 import com.silentpdf.app.data.db.SilentPdfDao
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -62,6 +63,8 @@ class OCREngine(private val dao: SilentPdfDao) {
             ))
             
             return@withContext words
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             e.printStackTrace()
             return@withContext emptyList()

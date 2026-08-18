@@ -6,6 +6,7 @@ import com.silentpdf.app.search.engine.OCREngine
 import com.silentpdf.app.search.engine.SearchEngine
 import com.silentpdf.app.search.engine.TextExtractionEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 class SearchRepository(
@@ -16,18 +17,20 @@ class SearchRepository(
         uriString: String,
         query: String,
         totalPages: Int,
+        useOcr: Boolean = false,
         bitmapProvider: suspend (Int) -> Bitmap?
     ): List<SearchResult> = withContext(Dispatchers.IO) {
         val uri = Uri.parse(uriString)
         val allResults = mutableListOf<SearchResult>()
         
         for (i in 0 until totalPages) {
+            ensureActive()
             // Try extracting text using PDFBox
             val textRes = textExtractionEngine.extractPageText(uri, i)
             
             var words = textRes.words
-            // If no text, try OCR fallback
-            if (words.isEmpty()) {
+            // If no text and OCR is explicitly requested, try OCR fallback
+            if (words.isEmpty() && useOcr) {
                 val bitmap = bitmapProvider(i)
                 words = ocrEngine.extractFromBitmap(uriString, i, bitmap)
             }

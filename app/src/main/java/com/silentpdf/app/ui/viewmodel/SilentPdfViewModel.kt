@@ -172,6 +172,11 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pdfSearchQuery = MutableStateFlow("")
     val pdfSearchQuery: StateFlow<String> = _pdfSearchQuery
 
+    private val _isOcrEnabled = MutableStateFlow(false)
+    val isOcrEnabled: StateFlow<Boolean> = _isOcrEnabled
+
+    private var searchJob: kotlinx.coroutines.Job? = null
+
     val pdfSearchResults = searchUseCase.searchResults
     val activeSearchMatchIndex = searchUseCase.activeMatchIndex
     val isSearchingInPdf = searchUseCase.isSearching
@@ -684,10 +689,19 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Executes asynchronous text search across the open PDF.
      */
+    fun toggleOcrEnabled() {
+        _isOcrEnabled.value = !_isOcrEnabled.value
+        searchInPdf(_pdfSearchQuery.value)
+    }
+
     fun searchInPdf(query: String) {
         _pdfSearchQuery.value = query
         val pdf = _currentPdf.value ?: return
-        viewModelScope.launch {
+        
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(300) // Debounce
+            
             if (query.isBlank()) {
                 searchUseCase.clearSearch()
                 return@launch
@@ -697,6 +711,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     uriString = pdf.uriString,
                     query = query,
                     totalPages = pdf.totalPages,
+                    useOcr = _isOcrEnabled.value,
                     bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
                 )
                 val firstMatchPage = searchUseCase.searchResults.value.firstOrNull()?.page

@@ -20,6 +20,7 @@ class SearchUseCase(private val repository: SearchRepository) {
         uriString: String,
         query: String,
         totalPages: Int,
+        useOcr: Boolean = false,
         bitmapProvider: suspend (Int) -> Bitmap?
     ) {
         if (query.isBlank()) {
@@ -30,7 +31,7 @@ class SearchUseCase(private val repository: SearchRepository) {
 
         _isSearching.value = true
         try {
-            val results = repository.searchPdf(uriString, query, totalPages, bitmapProvider)
+            val results = repository.searchPdf(uriString, query, totalPages, useOcr, bitmapProvider)
             _searchResults.value = results
             _activeMatchIndex.value = 0
         } finally {
