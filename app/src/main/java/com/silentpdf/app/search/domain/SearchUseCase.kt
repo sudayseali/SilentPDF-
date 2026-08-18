@@ -15,28 +15,57 @@ class SearchUseCase(private val repository: SearchRepository) {
 
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+    
+    private val _isOcrRequired = MutableStateFlow(false)
+    val isOcrRequired: StateFlow<Boolean> = _isOcrRequired.asStateFlow()
+    
+    private val _searchProgress = MutableStateFlow(0f)
+    val searchProgress: StateFlow<Float> = _searchProgress.asStateFlow()
 
     suspend fun performSearch(
         uriString: String,
         query: String,
         totalPages: Int,
         useOcr: Boolean = false,
+        pageIndex: Int? = null,
         bitmapProvider: suspend (Int) -> Bitmap?
     ) {
         if (query.isBlank()) {
             _searchResults.value = emptyList()
             _activeMatchIndex.value = 0
+            _isOcrRequired.value = false
+            _searchProgress.value = 0f
             return
         }
 
         _isSearching.value = true
+        _isOcrRequired.value = false
+        _searchProgress.value = 0f
         try {
-            val results = repository.searchPdf(uriString, query, totalPages, useOcr, bitmapProvider)
-            _searchResults.value = results
+            val results = repository.searchPdf(uriString, query, totalPages, useOcr, pageIndex, bitmapProvider) { progress ->
+                _searchProgress.value = progress
+            }
+            
+            if (pageIndex != null) {
+                // Merge new results with existing results for this specific page
+                val existing = _searchResults.value.filter { it.page != pageIndex }
+                _searchResults.value = (existing + results).sortedBy { it.page }
+            } else {
+                _searchResults.value = results
+            }
+            
             _activeMatchIndex.value = 0
+        } catch (e: OcrRequiredException) {
+            _searchResults.value = emptyList()
+            _activeMatchIndex.value = 0
+            _isOcrRequired.value = true
         } finally {
             _isSearching.value = false
         }
+    }
+
+    fun setOcrRequired(required: Boolean) {
+        _isOcrRequired.value = required
     }
 
     fun nextMatch(): Int? {

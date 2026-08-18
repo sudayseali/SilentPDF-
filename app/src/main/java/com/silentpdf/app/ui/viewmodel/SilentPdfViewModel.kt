@@ -172,14 +172,68 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pdfSearchQuery = MutableStateFlow("")
     val pdfSearchQuery: StateFlow<String> = _pdfSearchQuery
 
-    private val _isOcrEnabled = MutableStateFlow(false)
-    val isOcrEnabled: StateFlow<Boolean> = _isOcrEnabled
-
     private var searchJob: kotlinx.coroutines.Job? = null
 
     val pdfSearchResults = searchUseCase.searchResults
     val activeSearchMatchIndex = searchUseCase.activeMatchIndex
     val isSearchingInPdf = searchUseCase.isSearching
+    val isOcrRequired = searchUseCase.isOcrRequired
+    val searchProgress = searchUseCase.searchProgress
+    
+    fun scanCurrentPageOcr() {
+        val query = _pdfSearchQuery.value
+        if (query.isBlank()) return
+        val pdf = _currentPdf.value ?: return
+        
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            try {
+                searchUseCase.setOcrRequired(false)
+                searchUseCase.performSearch(
+                    uriString = pdf.uriString,
+                    query = query,
+                    totalPages = _pageCount.value,
+                    useOcr = true,
+                    pageIndex = _currentPage.value,
+                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                )
+            } catch (e: Exception) {
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e("SilentPdfViewModel", "Failed to OCR current page", e)
+                }
+            }
+        }
+    }
+    
+    fun scanEntireDocumentOcr() {
+        val query = _pdfSearchQuery.value
+        if (query.isBlank()) return
+        val pdf = _currentPdf.value ?: return
+        
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            try {
+                searchUseCase.setOcrRequired(false)
+                searchUseCase.performSearch(
+                    uriString = pdf.uriString,
+                    query = query,
+                    totalPages = _pageCount.value,
+                    useOcr = true,
+                    pageIndex = null,
+                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                )
+            } catch (e: Exception) {
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e("SilentPdfViewModel", "Failed to OCR entire document", e)
+                }
+            }
+        }
+    }
+    
+    fun cancelOcrRequirement() {
+        searchUseCase.setOcrRequired(false)
+        _pdfSearchQuery.value = ""
+    }
 
     fun setActiveSearchMatch(index: Int) {
         // Implementation updated later if needed
@@ -615,6 +669,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun closePdf() {
+        searchJob?.cancel()
+        searchJob = null
         _currentPageBitmap.value = null
         renderEngine.closeDocument()
         com.silentpdf.app.util.ViewRecycler.clearMemory()
@@ -689,11 +745,6 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Executes asynchronous text search across the open PDF.
      */
-    fun toggleOcrEnabled() {
-        _isOcrEnabled.value = !_isOcrEnabled.value
-        searchInPdf(_pdfSearchQuery.value)
-    }
-
     fun searchInPdf(query: String) {
         _pdfSearchQuery.value = query
         val pdf = _currentPdf.value ?: return
@@ -707,11 +758,12 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 return@launch
             }
             try {
+                searchUseCase.setOcrRequired(false)
                 searchUseCase.performSearch(
                     uriString = pdf.uriString,
                     query = query,
                     totalPages = pdf.totalPages,
-                    useOcr = _isOcrEnabled.value,
+                    useOcr = false,
                     bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
                 )
                 val firstMatchPage = searchUseCase.searchResults.value.firstOrNull()?.page
@@ -719,7 +771,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                     _currentPage.value = firstMatchPage
                 }
             } catch (e: Exception) {
-                Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
+                }
             }
         }
     }

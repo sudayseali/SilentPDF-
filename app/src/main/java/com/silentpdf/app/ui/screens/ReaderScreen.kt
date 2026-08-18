@@ -177,8 +177,9 @@ fun ReaderScreen(
     val searchInPdfQuery by viewModel.pdfSearchQuery.collectAsState()
     val searchResults by viewModel.pdfSearchResults.collectAsState()
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
+    val isOcrRequired by viewModel.isOcrRequired.collectAsState()
     val isSearchingInPdf by viewModel.isSearchingInPdf.collectAsState()
-    val isOcrEnabled by viewModel.isOcrEnabled.collectAsState()
+    val searchProgress by viewModel.searchProgress.collectAsState()
 
     // Outline flows
     val pdfOutline by viewModel.pdfOutline.collectAsState()
@@ -682,28 +683,43 @@ fun ReaderScreen(
                                             )
                                         )
                                         
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(bottom = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.SpaceBetween
-                                        ) {
-                                            Text(
-                                                "Scan document for text (OCR)",
-                                                fontSize = 12.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Switch(
-                                                checked = isOcrEnabled,
-                                                onCheckedChange = { viewModel.toggleOcrEnabled() },
-                                                modifier = Modifier.scale(0.7f)
-                                            )
-                                        }
-
-                                        if (isSearchingInPdf) {
+                                        if (isOcrRequired) {
+                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = "No searchable text available. OCR is required.",
+                                                        fontSize = 13.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(16.dp))
+                                                    Button(onClick = { viewModel.scanCurrentPageOcr() }) {
+                                                        Text("Scan Current Page")
+                                                    }
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Button(onClick = { viewModel.scanEntireDocumentOcr() }) {
+                                                        Text("Scan Entire Document")
+                                                    }
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    TextButton(onClick = { viewModel.cancelOcrRequirement() }) {
+                                                        Text("Cancel")
+                                                    }
+                                                }
+                                            }
+                                        } else if (isSearchingInPdf) {
                                             Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                                                CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                                                    if (searchProgress > 0f && searchProgress < 1f) {
+                                                        Spacer(modifier = Modifier.height(8.dp))
+                                                        Text(
+                                                            text = "Scanning: ${(searchProgress * 100).toInt()}%",
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.primary
+                                                        )
+                                                    }
+                                                }
                                             }
                                         } else if (searchInPdfQuery.isEmpty()) {
                                             Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
