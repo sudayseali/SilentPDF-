@@ -7,6 +7,8 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -16,18 +18,38 @@ class PdfRenderEngine(private val context: Context) {
     private var fileDescriptor: ParcelFileDescriptor? = null
     private var pdfRenderer: PdfRenderer? = null
     private var currentUri: Uri? = null
+    private var documentGeneration: Long = 0L
     
     private val renderLock = Any()
 
-    // Cache of page bitmaps to avoid redundant rendering
-    // Uses an LRU cache with max 3 active bitmaps to save RAM
-    private val bitmapCache = object : android.util.LruCache<Int, Bitmap>(3) {}
+    // Dynamically calculate cache memory limit: 1/8th of JVM max heap, bounded between 16MB and 64MB
+    private val maxCacheMemoryKb: Int = run {
+        val maxMemKb = (Runtime.getRuntime().maxMemory() / 1024).toInt()
+        (maxMemKb / 8).coerceIn(16 * 1024, 64 * 1024)
+    }
+
+    // Memory-aware LRU cache using composite document-aware keys (Uri + PageIndex + TargetWidth)
+    private val bitmapCache = object : android.util.LruCache<String, Bitmap>(maxCacheMemoryKb) {
+        override fun sizeOf(key: String, bitmap: Bitmap): Int {
+            val byteCount = try {
+                bitmap.byteCount
+            } catch (e: Exception) {
+                bitmap.width * bitmap.height * 4
+            }
+            return (byteCount / 1024).coerceAtLeast(1)
+        }
+    }
+
+    private fun buildCacheKey(uri: Uri?, pageIndex: Int, width: Int): String {
+        return "${uri?.toString().orEmpty()}#$pageIndex#$width"
+    }
 
     suspend fun openDocument(uri: Uri, password: String? = null): Int = withContext(Dispatchers.IO) {
         closeDocument()
         synchronized(renderLock) {
             try {
                 currentUri = uri
+                documentGeneration++
                 val resolver = context.contentResolver
                 fileDescriptor = resolver.openFileDescriptor(uri, "r")
                 fileDescriptor?.let { fd ->
@@ -90,21 +112,40 @@ class PdfRenderEngine(private val context: Context) {
     }
 
     suspend fun renderPage(pageIndex: Int, targetWidth: Int): Bitmap? = withContext(Dispatchers.IO) {
+        ensureActive()
+
+        // Quick lock-free cache check
+        val activeUri = currentUri ?: return@withContext null
+        val cacheKey = buildCacheKey(activeUri, pageIndex, targetWidth)
+        val cached = bitmapCache.get(cacheKey)
+        if (cached != null && !cached.isRecycled) {
+            return@withContext cached
+        }
+
         synchronized(renderLock) {
+            if (!isActive) return@withContext null
+
             val renderer = pdfRenderer ?: return@withContext null
+            val currentGen = documentGeneration
+            val uri = currentUri ?: return@withContext null
+            val key = buildCacheKey(uri, pageIndex, targetWidth)
+
+            // Double check cache after acquiring lock
+            val lockedCached = bitmapCache.get(key)
+            if (lockedCached != null && !lockedCached.isRecycled) {
+                return@withContext lockedCached
+            }
+
             val count = renderer.pageCount
             if (pageIndex < 0 || pageIndex >= count) return@withContext null
-    
-            val cached = bitmapCache.get(pageIndex)
-            if (cached != null && !cached.isRecycled) {
-                return@withContext cached
-            }
     
             try {
                 val page = renderer.openPage(pageIndex)
                 try {
-                    val originalWidth = page.width
-                    val originalHeight = page.height
+                    if (!isActive) return@withContext null
+
+                    val originalWidth = page.width.coerceAtLeast(1)
+                    val originalHeight = page.height.coerceAtLeast(1)
     
                     // Scale factor to downscale large high-dpi page bitmaps for mobile widths
                     val scale = if (targetWidth > 0) {
@@ -129,19 +170,25 @@ class PdfRenderEngine(private val context: Context) {
                         }
                     } catch (e: OutOfMemoryError) {
                         Log.e("PdfRenderEngine", "OOM when creating bitmap for page $pageIndex", e)
-                        System.gc() // Hint GC
-                        // Fallback to smaller bitmap to save memory
+                        System.gc()
                         val smallerWidth = (renderWidth / 2).coerceAtLeast(100)
                         val smallerHeight = (renderHeight / 2).coerceAtLeast(100)
                         Bitmap.createBitmap(smallerWidth, smallerHeight, Bitmap.Config.ARGB_8888).apply {
                             eraseColor(android.graphics.Color.WHITE)
                         }
                     }
+
+                    if (!isActive) return@withContext null
     
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
     
-                    bitmapCache.put(pageIndex, bitmap)
-                    return@withContext bitmap
+                    // Only cache and return if document is still active and unchanged
+                    if (documentGeneration == currentGen && currentUri == uri) {
+                        bitmapCache.put(key, bitmap)
+                        return@withContext bitmap
+                    } else {
+                        return@withContext null
+                    }
                 } finally {
                     try {
                         page.close()
@@ -149,6 +196,8 @@ class PdfRenderEngine(private val context: Context) {
                         Log.e("PdfRenderEngine", "Error closing page $pageIndex", e)
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: OutOfMemoryError) {
                 Log.e("PdfRenderEngine", "OOM during renderPage $pageIndex", e)
                 return@withContext null
@@ -165,8 +214,8 @@ class PdfRenderEngine(private val context: Context) {
 
     fun closeDocument() {
         synchronized(renderLock) {
-            // Let the GC handle native memory. Recycling here causes "Canvas: trying to use a recycled bitmap"
-            // if Compose or ML Kit are currently holding references during a PDF close.
+            documentGeneration++
+            // Evict cache to drop references; GC will reclaim native memory safely
             bitmapCache.evictAll()
     
             try {

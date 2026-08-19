@@ -173,6 +173,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     val pdfSearchQuery: StateFlow<String> = _pdfSearchQuery
 
     private var searchJob: kotlinx.coroutines.Job? = null
+    private var renderJob: kotlinx.coroutines.Job? = null
 
     val pdfSearchResults = searchUseCase.searchResults
     val activeSearchMatchIndex = searchUseCase.activeMatchIndex
@@ -675,6 +676,8 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     fun closePdf() {
         searchJob?.cancel()
         searchJob = null
+        renderJob?.cancel()
+        renderJob = null
         _currentPageBitmap.value = null
         renderEngine.closeDocument()
         com.silentpdf.app.util.ViewRecycler.clearMemory()
@@ -715,9 +718,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun renderCurrentPage(targetWidth: Int) {
-        viewModelScope.launch {
+        renderJob?.cancel()
+        renderJob = viewModelScope.launch(Dispatchers.IO) {
             val page = _currentPage.value
-            if (_pageCount.value > 0) {
+            if (_pageCount.value > 0 && _currentPdf.value != null) {
                 val bitmap = renderEngine.renderPage(page, targetWidth)
                 _currentPageBitmap.value = bitmap
             }
@@ -725,7 +729,9 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     suspend fun getPageBitmap(pageIndex: Int, targetWidth: Int): Bitmap? {
-        return if (_pageCount.value > 0 && pageIndex in 0 until _pageCount.value) {
+        val total = _pageCount.value
+        val pdf = _currentPdf.value
+        return if (pdf != null && total > 0 && pageIndex in 0 until total) {
             renderEngine.renderPage(pageIndex, targetWidth)
         } else {
             null
@@ -836,7 +842,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 _openedPdfTextPages.value = textSearcher.getPagesText(
                     uri = uri,
-                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
+                    bitmapProvider = null
                 )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,12 +73,12 @@ fun PdfPageItem(
     val activeSearchMatchIndex by viewModel.activeSearchMatchIndex.collectAsState()
     val searchQuery by viewModel.pdfSearchQuery.collectAsState()
 
-    LaunchedEffect(pageIndex, targetWidth) {
-        if (targetWidth > 0) {
-            launch(Dispatchers.IO) {
-                val newBitmap = viewModel.getPageBitmap(pageIndex, targetWidth)
-                bitmap = newBitmap
-            }
+    LaunchedEffect(pageIndex, targetWidth, currentPdf?.uriString) {
+        if (targetWidth > 0 && currentPdf != null) {
+            val newBitmap = viewModel.getPageBitmap(pageIndex, targetWidth)
+            bitmap = newBitmap
+        } else {
+            bitmap = null
         }
     }
 
@@ -108,10 +110,25 @@ fun PdfPageItem(
         var scale by remember { mutableFloatStateOf(1f) }
         var offset by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
 
+        val pageText by viewModel.openedPdfTextPages.collectAsState()
+        val text = pageText.getOrNull(pageIndex)?.trim() ?: ""
+        
+        val semanticDescription = remember(pageIndex, text) {
+            val base = "Page ${pageIndex + 1}"
+            if (text.isNotEmpty()) {
+                "$base. \n$text"
+            } else {
+                "$base. Scanned image or empty page."
+            }
+        }
+
         Box(
             modifier = modifier
                 .fillMaxWidth()
                 .background(pageBackgroundColor)
+                .semantics(mergeDescendants = true) { 
+                    contentDescription = semanticDescription 
+                }
                 .pointerInput(isDrawingMode) {
                     if (!isDrawingMode) {
                         awaitEachGesture {
@@ -189,7 +206,7 @@ fun PdfPageItem(
             if (bitmap != null) {
                 Image(
                     bitmap = bitmap!!.asImageBitmap(),
-                    contentDescription = "PDF Page ${pageIndex + 1}",
+                    contentDescription = null,
                     colorFilter = pageColorFilter,
                     modifier = Modifier.fillMaxWidth(),
                     contentScale = ContentScale.FillWidth

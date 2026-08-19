@@ -70,6 +70,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -135,15 +141,6 @@ fun ReaderScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
-
-    val handleExit = {
-        viewModel.closePdf()
-        onNavigateBack()
-    }
-
-    BackHandler {
-        handleExit()
-    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -256,6 +253,24 @@ fun ReaderScreen(
     }
     var isOcrProcessing by remember { mutableStateOf(false) }
     var ocrExtractedText by remember { mutableStateOf("") }
+    
+    val handleExit = {
+        viewModel.closePdf()
+        onNavigateBack()
+    }
+
+    BackHandler {
+        if (showSearchOverlay) {
+            showSearchOverlay = false
+            viewModel.searchInPdf("")
+        } else if (isDrawingMode) {
+            isDrawingMode = false
+        } else if (drawerState.isOpen) {
+            coroutineScope.launch { drawerState.close() }
+        } else {
+            handleExit()
+        }
+    }
 
     val bionicConfig by viewModel.bionicConfig.collectAsState()
 
@@ -460,7 +475,7 @@ fun ReaderScreen(
                             if (selectedDrawerTab == 3) {
                                 // Notes list
                                 if (currentNotes.isEmpty()) {
-                                    Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                    Box(modifier = Modifier.fillMaxSize().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
                                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                             Icon(
                                                 imageVector = Icons.Default.Edit, 
@@ -470,10 +485,19 @@ fun ReaderScreen(
                                             )
                                             Spacer(modifier = Modifier.height(12.dp))
                                             Text(
-                                                text = "No notes added to this book.",
-                                                fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                text = "No notes yet",
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
                                                 textAlign = TextAlign.Center
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "Tap the edit icon in the toolbar to draw or type notes on a page.",
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                modifier = Modifier.padding(horizontal = 16.dp)
                                             )
                                         }
                                     }
@@ -543,15 +567,24 @@ fun ReaderScreen(
                                             CircularProgressIndicator(strokeWidth = 3.dp)
                                         }
                                     } else if (pdfOutline.isEmpty()) {
-                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Icon(Icons.Outlined.ImportContacts, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                                                 Spacer(modifier = Modifier.height(12.dp))
                                                 Text(
                                                     text = "No chapters found",
                                                     fontSize = 14.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     textAlign = TextAlign.Center
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = "This document does not contain an embedded table of contents.",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.padding(horizontal = 16.dp)
                                                 )
                                             }
                                         }
@@ -606,15 +639,24 @@ fun ReaderScreen(
 
                                 1 -> { // Bookmarks list
                                     if (bookmarks.isEmpty()) {
-                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+                                        Box(modifier = Modifier.fillMaxSize().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Icon(Icons.Outlined.BookmarkBorder, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
                                                 Spacer(modifier = Modifier.height(12.dp))
                                                 Text(
-                                                    text = "No recently bookmarked pages.",
-                                                    fontSize = 13.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    text = "No bookmarks yet",
+                                                    fontSize = 14.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.onSurface,
                                                     textAlign = TextAlign.Center
+                                                )
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                                Text(
+                                                    text = "Tap the bookmark icon in the toolbar to save pages for later.",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center,
+                                                    modifier = Modifier.padding(horizontal = 16.dp)
                                                 )
                                             }
                                         }
@@ -708,15 +750,18 @@ fun ReaderScreen(
                                                 }
                                             }
                                         } else if (isSearchingInPdf) {
-                                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                                            Box(modifier = Modifier.fillMaxWidth().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                    CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                                                    CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(24.dp).semantics { contentDescription = "Searching..." })
                                                     if (searchProgress > 0f && searchProgress < 1f) {
                                                         Spacer(modifier = Modifier.height(8.dp))
                                                         Text(
                                                             text = "Scanning: ${(searchProgress * 100).toInt()}%",
                                                             fontSize = 12.sp,
-                                                            color = MaterialTheme.colorScheme.primary
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.semantics { 
+                                                                contentDescription = "Scanning document, ${(searchProgress * 100).toInt()} percent complete." 
+                                                            }
                                                         )
                                                         Spacer(modifier = Modifier.height(8.dp))
                                                         TextButton(onClick = { viewModel.searchInPdf("") }) {
@@ -726,23 +771,45 @@ fun ReaderScreen(
                                                 }
                                             }
                                         } else if (searchInPdfQuery.isEmpty()) {
-                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "Type a word above to search across all pages.",
-                                                    fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    textAlign = TextAlign.Center
-                                                )
+                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.outline)
+                                                    Spacer(modifier = Modifier.height(12.dp))
+                                                    Text(
+                                                        text = "Search this document",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Text(
+                                                        text = "Type a word above to search across all pages.",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                }
                                             }
                                         } else if (searchResults.isEmpty()) {
-                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-                                                Text(
-                                                    text = "No results found.",
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Medium,
-                                                    color = MaterialTheme.colorScheme.error,
-                                                    textAlign = TextAlign.Center
-                                                )
+                                            Box(modifier = Modifier.fillMaxSize().padding(16.dp).semantics(mergeDescendants = true) {}, contentAlignment = Alignment.Center) {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = "No results found",
+                                                        fontSize = 14.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.error,
+                                                        textAlign = TextAlign.Center
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Text(
+                                                        text = "Check spelling or try using OCR if this is a scanned document.",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        textAlign = TextAlign.Center,
+                                                        modifier = Modifier.padding(horizontal = 16.dp)
+                                                    )
+                                                }
                                             }
                                         } else {
                                             Text(
@@ -893,11 +960,13 @@ fun ReaderScreen(
                                     val isBookmarked = bookmarks.any { it.pageNumber == currentPage }
                                     IconButton(
                                         onClick = { viewModel.toggleBookmarkCurrentPage() },
-                                        modifier = Modifier.size(36.dp)
+                                        modifier = Modifier.size(36.dp).semantics { 
+                                            stateDescription = if (isBookmarked) "Bookmarked" else "Not bookmarked"
+                                        }
                                     ) {
                                         Icon(
                                             imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                            contentDescription = "Bookmark",
+                                            contentDescription = "Toggle bookmark",
                                             tint = if (isBookmarked) Color(0xFFFF9500) else readerOnSurfaceVariantColor,
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -1412,7 +1481,10 @@ fun ReaderScreen(
                     }
 
                     if (isPdfLoading) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.semantics { contentDescription = "Loading document" }
+                        )
                     } else if (pageCount > 0) {
                         val pageBackgroundColor = when (readingTheme) {
                             "Dark" -> Color.DarkGray
@@ -1589,6 +1661,37 @@ fun ReaderScreen(
                                         }
                                     }
                                 }
+                            }
+                        }
+                    } else {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(32.dp).semantics(mergeDescendants = true) {}
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Unable to open PDF",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = pdfOpeningError ?: "This document may be corrupted or unsupported.",
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Button(onClick = handleExit) {
+                                Text("Close")
                             }
                         }
                     }
