@@ -23,16 +23,22 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("silentpdf.keystore")
-            storePassword = "silentpdf2024"
-            keyAlias = "silentpdf"
-            keyPassword = "silentpdf2024"
+            val ksFile = rootProject.file("silentpdf.keystore")
+            if (ksFile.exists() && ksFile.length() > 0) {
+                storeFile = ksFile
+                storePassword = "silentpdf2024"
+                keyAlias = "silentpdf"
+                keyPassword = "silentpdf2024"
+            } else {
+                initWith(getByName("debug"))
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
