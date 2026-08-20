@@ -47,102 +47,44 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val searchRepo = com.silentpdf.app.search.domain.SearchRepository(textExtractionEngine, ocrEngine)
     val searchUseCase = com.silentpdf.app.search.domain.SearchUseCase(searchRepo)
 
-    // State: User Search Query for Library list
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery
+    private val libraryController = com.silentpdf.app.ui.viewmodel.controllers.LibraryController(application, repository, viewModelScope)
 
-    // State: Selected Tab (0 = All, 1 = Recents, 2 = Bookmarks/Favorites)
-    private val _selectedTab = MutableStateFlow(0)
-    val selectedTab: StateFlow<Int> = _selectedTab
+    val searchQuery: StateFlow<String> = libraryController.searchQuery
+    val selectedTab: StateFlow<Int> = libraryController.selectedTab
+    val sortBy: StateFlow<Int> = libraryController.sortBy
+    val selectedCategory: StateFlow<String?> = libraryController.selectedCategory
+    val allCategories: StateFlow<List<String>> = libraryController.allCategories
+    val libraryPdfs: StateFlow<List<PdfEntity>> = libraryController.libraryPdfs
 
-    // State: Sorting (0 = Name, 1 = Date, 2 = Size)
-    private val _sortBy = MutableStateFlow(0)
-    val sortBy: StateFlow<Int> = _sortBy
+    fun createCategory(category: String) = libraryController.createCategory(category)
+    fun setSearchQuery(query: String) = libraryController.setSearchQuery(query)
+    fun setSelectedTab(tab: Int) = libraryController.setSelectedTab(tab)
+    fun setSortBy(sort: Int) = libraryController.setSortBy(sort)
+    fun setSelectedCategory(category: String?) = libraryController.setSelectedCategory(category)
 
-    // State: Selected Folder/Category (null means all folders/categories)
-    private val _selectedCategory = MutableStateFlow<String?>(null)
-    val selectedCategory: StateFlow<String?> = _selectedCategory
+    private val settingsController = com.silentpdf.app.ui.viewmodel.controllers.SettingsController(application)
 
-    private val customCategoriesPref = application.getSharedPreferences("app_custom_categories", android.content.Context.MODE_PRIVATE)
-    private val viewSettingsPrefs = application.getSharedPreferences("app_view_settings", android.content.Context.MODE_PRIVATE)
-
-    private val _customCategories = MutableStateFlow<Set<String>>(
-        customCategoriesPref.getStringSet("categories", emptySet()) ?: emptySet()
-    )
-
-    // Get list of unique categories/folders created by user
-    val allCategories: StateFlow<List<String>> = combine(
-        repository.allPdfsByName,
-        _customCategories
-    ) { pdfs, custom ->
-        val fromPdfs = pdfs.mapNotNull { it.category }
-        (fromPdfs + custom).distinct().sorted()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    fun createCategory(category: String) {
-        val trimmed = category.trim()
-        if (trimmed.isNotBlank()) {
-            val updated = _customCategories.value + trimmed
-            _customCategories.value = updated
-            customCategoriesPref.edit().putStringSet("categories", updated).apply()
-            setSelectedCategory(trimmed)
-        }
-    }
-
-    // View Settings (True Dark Mode, Grid/List view, Horizontal vs Vertical scrolling)
-    private val _isTrueDarkMode = MutableStateFlow(viewSettingsPrefs.getBoolean("true_dark_mode", false))
-    val isTrueDarkMode: StateFlow<Boolean> = _isTrueDarkMode
-
-    private val _isAppDarkMode = MutableStateFlow(viewSettingsPrefs.getBoolean("app_dark_mode", false))
-    val isAppDarkMode: StateFlow<Boolean> = _isAppDarkMode
-
-    private val _isGridView = MutableStateFlow(viewSettingsPrefs.getBoolean("grid_view", false))
-    val isGridView: StateFlow<Boolean> = _isGridView
-
-    private val _isHorizontalScroll = MutableStateFlow(viewSettingsPrefs.getBoolean("horizontal_scroll", false))
-    val isHorizontalScroll: StateFlow<Boolean> = _isHorizontalScroll
-
-    // Advanced Bionic Reading Settings
-    private val bionicPrefs = application.getSharedPreferences("app_bionic_settings", android.content.Context.MODE_PRIVATE)
-
-    private val _bionicConfig = MutableStateFlow(
-        BionicConfig(
-            isEnabled = bionicPrefs.getBoolean("is_enabled", false),
-            intensity = try { BionicIntensity.valueOf(bionicPrefs.getString("intensity", "MEDIUM") ?: "MEDIUM") } catch (e: Exception) { BionicIntensity.MEDIUM },
-            customIntensityPercentage = bionicPrefs.getFloat("custom_percentage", 0.50f),
-            language = try { BionicLanguage.valueOf(bionicPrefs.getString("language", "AUTO") ?: "AUTO") } catch (e: Exception) { BionicLanguage.AUTO },
-            performanceMode = try { BionicPerformanceMode.valueOf(bionicPrefs.getString("performance_mode", "QUALITY") ?: "QUALITY") } catch (e: Exception) { BionicPerformanceMode.QUALITY },
-            autoOcrForScanned = bionicPrefs.getBoolean("auto_ocr", true)
-        )
-    )
-    val bionicConfig: StateFlow<BionicConfig> = _bionicConfig
+    val isTrueDarkMode: StateFlow<Boolean> = settingsController.isTrueDarkMode
+    val isAppDarkMode: StateFlow<Boolean> = settingsController.isAppDarkMode
+    val isGridView: StateFlow<Boolean> = settingsController.isGridView
+    val isHorizontalScroll: StateFlow<Boolean> = settingsController.isHorizontalScroll
+    val bionicConfig: StateFlow<BionicConfig> = settingsController.bionicConfig
 
     fun updateBionicConfig(
-        isEnabled: Boolean = _bionicConfig.value.isEnabled,
-        intensity: BionicIntensity = _bionicConfig.value.intensity,
-        customPercentage: Float = _bionicConfig.value.customIntensityPercentage,
-        language: BionicLanguage = _bionicConfig.value.language,
-        performanceMode: BionicPerformanceMode = _bionicConfig.value.performanceMode,
-        autoOcrForScanned: Boolean = _bionicConfig.value.autoOcrForScanned
+        isEnabled: Boolean = bionicConfig.value.isEnabled,
+        intensity: BionicIntensity = bionicConfig.value.intensity,
+        customPercentage: Float = bionicConfig.value.customIntensityPercentage,
+        language: BionicLanguage = bionicConfig.value.language,
+        performanceMode: BionicPerformanceMode = bionicConfig.value.performanceMode,
+        autoOcrForScanned: Boolean = bionicConfig.value.autoOcrForScanned
     ) {
-        val newConfig = BionicConfig(
-            isEnabled = isEnabled,
-            intensity = intensity,
-            customIntensityPercentage = customPercentage,
-            language = language,
-            performanceMode = performanceMode,
-            autoOcrForScanned = autoOcrForScanned
-        )
-        _bionicConfig.value = newConfig
-        bionicPrefs.edit()
-            .putBoolean("is_enabled", isEnabled)
-            .putString("intensity", intensity.name)
-            .putFloat("custom_percentage", customPercentage)
-            .putString("language", language.name)
-            .putString("performance_mode", performanceMode.name)
-            .putBoolean("auto_ocr", autoOcrForScanned)
-            .apply()
+        settingsController.updateBionicConfig(isEnabled, intensity, customPercentage, language, performanceMode, autoOcrForScanned)
     }
+
+    fun toggleTrueDarkMode() { settingsController.toggleTrueDarkMode() }
+    fun toggleAppDarkMode() { settingsController.toggleAppDarkMode() }
+    fun toggleGridView() { settingsController.toggleGridView() }
+    fun toggleHorizontalScroll() { settingsController.toggleHorizontalScroll() }
 
     suspend fun processBionicPage(
         pdfUri: String,
@@ -156,7 +98,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             pageIndex = pageIndex,
             rawText = rawText,
             bitmap = bitmap,
-            config = _bionicConfig.value,
+            config = bionicConfig.value,
             textColor = textColor
         )
     }
@@ -168,77 +110,29 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _pdfOpeningError = MutableStateFlow<String?>(null)
     val pdfOpeningError: StateFlow<String?> = _pdfOpeningError
 
-    // State: Text Search within the open PDF
-    private val _pdfSearchQuery = MutableStateFlow("")
-    val pdfSearchQuery: StateFlow<String> = _pdfSearchQuery
-
-    private var searchJob: kotlinx.coroutines.Job? = null
     private var renderJob: kotlinx.coroutines.Job? = null
 
-    val pdfSearchResults = searchUseCase.searchResults
-    val activeSearchMatchIndex = searchUseCase.activeMatchIndex
-    val isSearchingInPdf = searchUseCase.isSearching
-    val isOcrRequired = searchUseCase.isOcrRequired
-    val searchProgress = searchUseCase.searchProgress
-    
-    fun scanCurrentPageOcr() {
-        val query = _pdfSearchQuery.value
-        if (query.isBlank()) return
-        val pdf = _currentPdf.value ?: return
-        
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            try {
-                searchUseCase.setOcrRequired(false)
-                searchUseCase.performSearch(
-                    uriString = pdf.uriString,
-                    query = query,
-                    totalPages = _pageCount.value,
-                    useOcr = true,
-                    pageIndex = _currentPage.value,
-                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
-                )
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("SilentPdfViewModel", "Failed to OCR current page", e)
-            }
-        }
-    }
-    
-    fun scanEntireDocumentOcr() {
-        val query = _pdfSearchQuery.value
-        if (query.isBlank()) return
-        val pdf = _currentPdf.value ?: return
-        
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            try {
-                searchUseCase.setOcrRequired(false)
-                searchUseCase.performSearch(
-                    uriString = pdf.uriString,
-                    query = query,
-                    totalPages = _pageCount.value,
-                    useOcr = true,
-                    pageIndex = null,
-                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
-                )
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("SilentPdfViewModel", "Failed to OCR entire document", e)
-            }
-        }
-    }
-    
-    fun cancelOcrRequirement() {
-        searchUseCase.setOcrRequired(false)
-        _pdfSearchQuery.value = ""
-    }
+    private val searchController = com.silentpdf.app.ui.viewmodel.controllers.SearchController(
+        searchUseCase = searchUseCase,
+        renderEngine = renderEngine,
+        coroutineScope = viewModelScope,
+        getCurrentPdf = { _currentPdf.value },
+        getPageCount = { _pageCount.value },
+        getCurrentPage = { _currentPage.value },
+        onPageJumpRequested = { page -> _currentPage.value = page }
+    )
 
-    fun setActiveSearchMatch(index: Int) {
-        // Implementation updated later if needed
-    }
+    val pdfSearchQuery: StateFlow<String> = searchController.pdfSearchQuery
+    val pdfSearchResults = searchController.pdfSearchResults
+    val activeSearchMatchIndex = searchController.activeSearchMatchIndex
+    val isSearchingInPdf = searchController.isSearchingInPdf
+    val isOcrRequired = searchController.isOcrRequired
+    val searchProgress = searchController.searchProgress
+
+    fun scanCurrentPageOcr() = searchController.scanCurrentPageOcr()
+    fun scanEntireDocumentOcr() = searchController.scanEntireDocumentOcr()
+    fun cancelOcrRequirement() = searchController.cancelOcrRequirement()
+    fun setActiveSearchMatch(index: Int) = searchController.setActiveSearchMatch(index)
 
     // State: Table of Contents / Outline entries
     private val _pdfOutline = MutableStateFlow<List<PdfTextSearcher.OutlineItem>>(emptyList())
@@ -246,40 +140,6 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isOutlineLoading = MutableStateFlow(false)
     val isOutlineLoading: StateFlow<Boolean> = _isOutlineLoading
-
-    // Combines DB flows, search, sort, folder selection, and tab filters into a single StateFlow of UI list
-    val libraryPdfs: StateFlow<List<PdfEntity>> = combine(
-        _selectedTab,
-        _searchQuery,
-        _sortBy,
-        _selectedCategory,
-        repository.allPdfsByName
-    ) { tab, query, sort, category, allPdfs ->
-        val baseList = when (tab) {
-            1 -> allPdfs.filter { it.lastPageRead > 0 || it.lastAccessTime > 0 }
-            2 -> allPdfs.filter { it.isFavorite }
-            else -> {
-                if (category != null) {
-                    allPdfs.filter { it.category == category }
-                } else {
-                    allPdfs
-                }
-            }
-        }
-
-        val filteredList = if (query.isBlank()) {
-            baseList
-        } else {
-            baseList.filter { it.fileName.contains(query, ignoreCase = true) }
-        }
-
-        when (sort) {
-            0 -> filteredList.sortedBy { it.fileName.lowercase() }
-            1 -> filteredList.sortedByDescending { it.lastAccessTime }
-            2 -> filteredList.sortedByDescending { it.fileSize }
-            else -> filteredList
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Reader UI States
     private val _currentPdf = MutableStateFlow<PdfEntity?>(null)
@@ -294,63 +154,35 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _currentPageBitmap = MutableStateFlow<Bitmap?>(null)
     val currentPageBitmap: StateFlow<Bitmap?> = _currentPageBitmap
 
-    private val _pageDrawings = MutableStateFlow<Map<String, Map<Int, List<DrawingStroke>>>>(emptyMap())
-    val pageDrawings: StateFlow<Map<String, Map<Int, List<DrawingStroke>>>> = _pageDrawings
-
-    private val _redoStack = MutableStateFlow<List<Pair<Pair<String, Int>, DrawingStroke>>>(emptyList())
+    private val drawingController = com.silentpdf.app.ui.viewmodel.controllers.DrawingController()
+    val pageDrawings: StateFlow<Map<String, Map<Int, List<DrawingStroke>>>> = drawingController.pageDrawings
 
     fun addStroke(pdfUri: String, page: Int, stroke: DrawingStroke) {
-        val currentDrawings = _pageDrawings.value.toMutableMap()
-        val pdfDrawings = currentDrawings[pdfUri]?.toMutableMap() ?: mutableMapOf()
-        val pageStrokes = pdfDrawings[page]?.toMutableList() ?: mutableListOf()
-        pageStrokes.add(stroke)
-        pdfDrawings[page] = pageStrokes
-        currentDrawings[pdfUri] = pdfDrawings
-        _pageDrawings.value = currentDrawings
-        _redoStack.value = emptyList() // clear redo stack on new action
+        drawingController.addStroke(pdfUri, page, stroke)
     }
 
     fun undoLastStroke(pdfUri: String, page: Int) {
-        val currentDrawings = _pageDrawings.value.toMutableMap()
-        val pdfDrawings = currentDrawings[pdfUri]?.toMutableMap() ?: mutableMapOf()
-        val pageStrokes = pdfDrawings[page]?.toMutableList() ?: mutableListOf()
-        if (pageStrokes.isNotEmpty()) {
-            val removedStroke = pageStrokes.removeAt(pageStrokes.lastIndex)
-            pdfDrawings[page] = pageStrokes
-            currentDrawings[pdfUri] = pdfDrawings
-            _pageDrawings.value = currentDrawings
-            _redoStack.value = _redoStack.value + Pair(Pair(pdfUri, page), removedStroke)
-        }
+        drawingController.undoLastStroke(pdfUri, page)
     }
 
     fun redoLastStroke(pdfUri: String, page: Int) {
-        val stack = _redoStack.value.toMutableList()
-        val lastRedoIndex = stack.indexOfLast { it.first.first == pdfUri && it.first.second == page }
-        if (lastRedoIndex != -1) {
-            val lastRedo = stack.removeAt(lastRedoIndex)
-            _redoStack.value = stack
-            
-            val currentDrawings = _pageDrawings.value.toMutableMap()
-            val pdfDrawings = currentDrawings[pdfUri]?.toMutableMap() ?: mutableMapOf()
-            val pageStrokes = pdfDrawings[page]?.toMutableList() ?: mutableListOf()
-            pageStrokes.add(lastRedo.second)
-            pdfDrawings[page] = pageStrokes
-            currentDrawings[pdfUri] = pdfDrawings
-            _pageDrawings.value = currentDrawings
-        }
+        drawingController.redoLastStroke(pdfUri, page)
     }
 
-    val currentBookmarks: StateFlow<List<BookmarkEntity>> = _currentPdf
-        .flatMapLatest { pdf ->
-            pdf?.let { repository.getBookmarksForPdf(it.uriString) } ?: flowOf(emptyList())
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val currentNotes: StateFlow<List<com.silentpdf.app.data.db.NoteEntity>> = _currentPdf
-        .flatMapLatest { pdf ->
-            pdf?.let { repository.getNotesForPdf(it.uriString) } ?: flowOf(emptyList())
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val bookmarkNoteController = com.silentpdf.app.ui.viewmodel.controllers.BookmarkNoteController(
+        repository = repository,
+        coroutineScope = viewModelScope,
+        currentPdf = _currentPdf,
+        getCurrentPage = { _currentPage.value }
+    )
+    
+    val currentBookmarks: StateFlow<List<BookmarkEntity>> = bookmarkNoteController.currentBookmarks
+    val currentNotes: StateFlow<List<com.silentpdf.app.data.db.NoteEntity>> = bookmarkNoteController.currentNotes
+    
+    fun toggleBookmarkCurrentPage() = bookmarkNoteController.toggleBookmarkCurrentPage()
+    fun addOrUpdateNote(page: Int, text: String) = bookmarkNoteController.addOrUpdateNote(page, text)
+    fun removeNote(noteId: Long) = bookmarkNoteController.removeNote(noteId)
+    fun removeNoteForPage(page: Int) = bookmarkNoteController.removeNoteForPage(page)
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning
@@ -364,28 +196,6 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isAppLocked = MutableStateFlow(false)
     val isAppLocked: StateFlow<Boolean> = _isAppLocked
-
-    private var mediaRecorder: android.media.MediaRecorder? = null
-    private val _isRecording = MutableStateFlow(false)
-    val isRecording: StateFlow<Boolean> = _isRecording
-
-    private val _recordingSeconds = MutableStateFlow(0)
-    val recordingSeconds: StateFlow<Int> = _recordingSeconds
-
-    private var recordingFile: java.io.File? = null
-    private var recordingJob: kotlinx.coroutines.Job? = null
-
-    init {
-        // Check if an App PIN is set
-        val savedPin = securityPrefs.getString("app_pin", null)
-        if (!savedPin.isNullOrBlank()) {
-            _isPinConfigured.value = true
-            _isAppLocked.value = true
-        } else {
-            // Scan files on startup to populate library items if not locked
-            triggerScan()
-        }
-    }
 
     fun verifyPin(pin: String): Boolean {
         val savedPin = securityPrefs.getString("app_pin", "")
@@ -415,145 +225,37 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         _isAppLocked.value = false
     }
 
-    fun addOrUpdateNote(page: Int, text: String) {
-        val pdf = _currentPdf.value ?: return
-        viewModelScope.launch {
-            val existingNote = currentNotes.value.find { it.pageNumber == page }
-            if (existingNote != null && existingNote.noteText.startsWith("[audio:")) {
-                val oldPath = existingNote.noteText.substringAfter("[audio:").substringBefore("]")
-                val newPath = if (text.startsWith("[audio:")) text.substringAfter("[audio:").substringBefore("]") else null
-                if (oldPath != newPath) {
-                    try {
-                        val file = java.io.File(oldPath)
-                        if (file.exists()) file.delete()
-                    } catch (e: Exception) {
-                        Log.e("SilentPdfViewModel", "Error deleting orphaned voice note file", e)
-                    }
-                }
-            }
-            repository.addOrUpdateNote(pdf.uriString, page, text)
-        }
-    }
-
-    fun removeNote(noteId: Long) {
-        viewModelScope.launch {
-            val note = currentNotes.value.find { it.id == noteId }
-            if (note != null && note.noteText.startsWith("[audio:")) {
-                try {
-                    val filePath = note.noteText.substringAfter("[audio:").substringBefore("]")
-                    val file = java.io.File(filePath)
-                    if (file.exists()) {
-                        file.delete()
-                    }
-                } catch (e: Exception) {
-                    Log.e("SilentPdfViewModel", "Error deleting voice note file", e)
-                }
-            }
-            repository.removeNote(noteId)
-        }
-    }
-
-    fun removeNoteForPage(page: Int) {
-        val pdf = _currentPdf.value ?: return
-        viewModelScope.launch {
-            val note = currentNotes.value.find { it.pageNumber == page }
-            if (note != null && note.noteText.startsWith("[audio:")) {
-                try {
-                    val filePath = note.noteText.substringAfter("[audio:").substringBefore("]")
-                    val file = java.io.File(filePath)
-                    if (file.exists()) {
-                        file.delete()
-                    }
-                } catch (e: Exception) {
-                    Log.e("SilentPdfViewModel", "Error deleting voice note file for page", e)
-                }
-            }
-            repository.removeNoteForPage(pdf.uriString, page)
-        }
-    }
+    private val voiceRecordingController = com.silentpdf.app.ui.viewmodel.controllers.VoiceRecordingController(application, viewModelScope)
+    val isRecording: StateFlow<Boolean> = voiceRecordingController.isRecording
+    val recordingSeconds: StateFlow<Int> = voiceRecordingController.recordingSeconds
 
     fun startVoiceRecording(context: android.content.Context) {
-        val pdf = _currentPdf.value ?: return
-        try {
-            val dir = java.io.File(context.filesDir, "voice_notes").apply { mkdirs() }
-            val file = java.io.File(dir, "voice_${System.currentTimeMillis()}.mp4")
-            recordingFile = file
-            
-            val attributionContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                context.createAttributionContext("voice_notes")
-            } else {
-                context
-            }
-
-            val recorder = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                android.media.MediaRecorder(attributionContext)
-            } else {
-                @Suppress("DEPRECATION")
-                android.media.MediaRecorder()
-            }
-            
-            recorder.apply {
-                setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
-                setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
-                setOutputFile(file.absolutePath)
-                prepare()
-                start()
-            }
-            
-            mediaRecorder = recorder
-            _isRecording.value = true
-            _recordingSeconds.value = 0
-            
-            recordingJob = viewModelScope.launch {
-                while (_isRecording.value) {
-                    kotlinx.coroutines.delay(1000)
-                    _recordingSeconds.value += 1
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("SilentPdfViewModel", "Failed to start audio recording", e)
-        }
+        voiceRecordingController.startVoiceRecording()
     }
 
     fun stopVoiceRecording() {
-        if (!_isRecording.value) return
-        try {
-            mediaRecorder?.apply {
-                stop()
-                release()
-            }
-        } catch (e: Exception) {
-            Log.e("SilentPdfViewModel", "Error stopping MediaRecorder", e)
-        } finally {
-            mediaRecorder = null
-            _isRecording.value = false
-            recordingJob?.cancel()
-            recordingJob = null
-        }
-        
-        val file = recordingFile
-        val pdf = _currentPdf.value
-        if (file != null && file.exists() && pdf != null) {
-            val page = _currentPage.value
-            val existingNote = currentNotes.value.find { it.pageNumber == page }
-            val existingText = if (existingNote != null) {
-                if (existingNote.noteText.startsWith("[audio:")) {
-                    existingNote.noteText.substringAfter("]").trim()
+        voiceRecordingController.stopVoiceRecording { file ->
+            val pdf = _currentPdf.value
+            if (file != null && file.exists() && pdf != null) {
+                val page = _currentPage.value
+                val existingNote = currentNotes.value.find { it.pageNumber == page }
+                val existingText = if (existingNote != null) {
+                    if (existingNote.noteText.startsWith("[audio:")) {
+                        existingNote.noteText.substringAfter("]").trim()
+                    } else {
+                        existingNote.noteText
+                    }
+                } else ""
+                
+                val newNoteText = if (existingText.isNotEmpty()) {
+                    "[audio:${file.absolutePath}] $existingText"
                 } else {
-                    existingNote.noteText
+                    "[audio:${file.absolutePath}]"
                 }
-            } else ""
-            
-            val newNoteText = if (existingText.isNotEmpty()) {
-                "[audio:${file.absolutePath}] $existingText"
-            } else {
-                "[audio:${file.absolutePath}]"
+                
+                addOrUpdateNote(page, newNoteText)
             }
-            
-            addOrUpdateNote(page, newNoteText)
         }
-        recordingFile = null
     }
 
     fun triggerScan() {
@@ -571,35 +273,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun setSearchQuery(query: String) { _searchQuery.value = query }
-    fun setSelectedTab(tab: Int) { _selectedTab.value = tab }
-    fun setSortBy(sort: Int) { _sortBy.value = sort }
-    fun setSelectedCategory(category: String?) { _selectedCategory.value = category }
     fun updatePdfCategory(pdf: PdfEntity, category: String?) {
         viewModelScope.launch {
             repository.updateCategory(pdf.uriString, category?.takeIf { it.isNotBlank() })
         }
-    }
-    fun toggleTrueDarkMode() {
-        val newValue = !_isTrueDarkMode.value
-        _isTrueDarkMode.value = newValue
-        viewSettingsPrefs.edit().putBoolean("true_dark_mode", newValue).apply()
-    }
-
-    fun toggleAppDarkMode() {
-        val newValue = !_isAppDarkMode.value
-        _isAppDarkMode.value = newValue
-        viewSettingsPrefs.edit().putBoolean("app_dark_mode", newValue).apply()
-    }
-    fun toggleGridView() {
-        val newValue = !_isGridView.value
-        _isGridView.value = newValue
-        viewSettingsPrefs.edit().putBoolean("grid_view", newValue).apply()
-    }
-    fun toggleHorizontalScroll() {
-        val newValue = !_isHorizontalScroll.value
-        _isHorizontalScroll.value = newValue
-        viewSettingsPrefs.edit().putBoolean("horizontal_scroll", newValue).apply()
     }
 
     fun toggleFavorite(pdf: PdfEntity) {
@@ -632,8 +309,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
             // Clear prior document-specific states
             _isPasswordProtected.value = false
             _pdfOpeningError.value = null
-            _pdfSearchQuery.value = ""
-            searchUseCase.clearSearch()
+            searchController.cancelSearch()
             _pdfOutline.value = emptyList()
 
             try {
@@ -674,8 +350,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun closePdf() {
-        searchJob?.cancel()
-        searchJob = null
+        searchController.cancelSearch()
         renderJob?.cancel()
         renderJob = null
         _currentPageBitmap.value = null
@@ -686,8 +361,6 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         _currentPage.value = 0
         _isPasswordProtected.value = false
         _pdfOpeningError.value = null
-        _pdfSearchQuery.value = ""
-        searchUseCase.clearSearch()
         _pdfOutline.value = emptyList()
         _openedPdfTextPages.value = emptyList()
     }
@@ -738,65 +411,10 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun toggleBookmarkCurrentPage() {
-        val pdf = _currentPdf.value ?: return
-        val page = _currentPage.value
-        viewModelScope.launch {
-            val bookmarks = currentBookmarks.value
-            val existing = bookmarks.firstOrNull { it.pageNumber == page }
-            if (existing != null) {
-                repository.removeBookmark(existing.id)
-            } else {
-                repository.addBookmark(pdf.uriString, page, "Page ${page + 1}")
-            }
-        }
-    }
-
-    /**
-     * Executes asynchronous text search across the open PDF.
-     */
-    fun searchInPdf(query: String) {
-        _pdfSearchQuery.value = query
-        val pdf = _currentPdf.value ?: return
-        
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(300) // Debounce
-            
-            if (query.isBlank()) {
-                searchUseCase.clearSearch()
-                return@launch
-            }
-            try {
-                searchUseCase.setOcrRequired(false)
-                searchUseCase.performSearch(
-                    uriString = pdf.uriString,
-                    query = query,
-                    totalPages = pdf.totalPages,
-                    useOcr = false,
-                    bitmapProvider = { pageIdx -> renderEngine.renderPage(pageIdx, 800) }
-                )
-                val firstMatchPage = searchUseCase.searchResults.value.firstOrNull()?.page
-                if (firstMatchPage != null) {
-                    _currentPage.value = firstMatchPage
-                }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("SilentPdfViewModel", "Failed text search inside active PDF", e)
-            }
-        }
-    }
-    
-    fun nextSearchMatch() {
-        val page = searchUseCase.nextMatch()
-        if (page != null) _currentPage.value = page
-    }
-    
-    fun previousSearchMatch() {
-        val page = searchUseCase.previousMatch()
-        if (page != null) _currentPage.value = page
-    }
+    fun searchInPdf(query: String) = searchController.searchInPdf(query)
+    fun cancelSearch() = searchController.cancelSearch()
+    fun nextSearchMatch() = searchController.nextSearchMatch()
+    fun previousSearchMatch() = searchController.previousSearchMatch()
 
     /**
      * Extracts outline/chapters for table of contents.
@@ -852,83 +470,12 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    suspend fun rotatePages(pdf: PdfEntity, pageIndices: List<Int>): Boolean {
-        val app = getApplication<android.app.Application>()
-        val destFile = java.io.File(app.cacheDir, "temp_rotated.pdf")
-        val success = com.silentpdf.app.util.PdfPageManager.rotatePages(app, android.net.Uri.parse(pdf.uriString), pageIndices, destFile)
-        if (success) {
-            return replacePdfWithTemp(pdf, destFile)
-        }
-        return false
-    }
+    private val pdfEditController = com.silentpdf.app.ui.viewmodel.controllers.PdfEditController(application, repository, renderEngine)
 
-    suspend fun deletePages(pdf: PdfEntity, pageIndices: List<Int>): Boolean {
-        val app = getApplication<android.app.Application>()
-        val destFile = java.io.File(app.cacheDir, "temp_deleted.pdf")
-        val success = com.silentpdf.app.util.PdfPageManager.deletePages(app, android.net.Uri.parse(pdf.uriString), pageIndices, destFile)
-        if (success) {
-            return replacePdfWithTemp(pdf, destFile)
-        }
-        return false
-    }
-
-    suspend fun insertBlankPage(pdf: PdfEntity, afterPageIndex: Int): Boolean {
-        val app = getApplication<android.app.Application>()
-        val destFile = java.io.File(app.cacheDir, "temp_inserted.pdf")
-        val success = com.silentpdf.app.util.PdfPageManager.insertBlankPage(app, android.net.Uri.parse(pdf.uriString), afterPageIndex, destFile)
-        if (success) {
-            return replacePdfWithTemp(pdf, destFile)
-        }
-        return false
-    }
-
-    suspend fun extractPages(pdf: PdfEntity, pageIndices: List<Int>): Boolean {
-        val app = getApplication<android.app.Application>()
-        val destFile = java.io.File(app.filesDir, "extracted_${System.currentTimeMillis()}.pdf")
-        val success = com.silentpdf.app.util.PdfPageManager.extractPages(app, android.net.Uri.parse(pdf.uriString), pageIndices, destFile)
-        if (success) {
-            val extractedPdf = PdfEntity(
-                fileName = "${pdf.fileName.substringBeforeLast(".")}_extracted.pdf",
-                uriString = android.net.Uri.fromFile(destFile).toString(),
-                fileSize = destFile.length(),
-                lastAccessTime = System.currentTimeMillis()
-            )
-            repository.insertOrUpdatePdf(extractedPdf)
-            return true
-        }
-        return false
-    }
-
-    private suspend fun replacePdfWithTemp(pdf: PdfEntity, tempFile: java.io.File): Boolean {
-        val app = getApplication<android.app.Application>()
-        return try {
-            val originalUri = android.net.Uri.parse(pdf.uriString)
-            if (originalUri.scheme == "file") {
-                val originalFile = java.io.File(originalUri.path!!)
-                tempFile.copyTo(originalFile, overwrite = true)
-            } else {
-                app.contentResolver.openOutputStream(originalUri)?.use { out ->
-                    java.io.FileInputStream(tempFile).use { input ->
-                        input.copyTo(out)
-                    }
-                }
-            }
-            // Update file size in DB
-            val updatedSize = if (originalUri.scheme == "file") {
-                java.io.File(originalUri.path!!).length()
-            } else {
-                app.contentResolver.openFileDescriptor(originalUri, "r")?.statSize ?: pdf.fileSize
-            }
-            repository.insertOrUpdatePdf(pdf.copy(fileSize = updatedSize))
-            
-            // Reload the PDF engine
-            renderEngine.openDocument(originalUri)
-            true
-        } catch (e: Exception) {
-            e.printStackTrace()
-            false
-        }
-    }
+    suspend fun rotatePages(pdf: PdfEntity, pageIndices: List<Int>) = pdfEditController.rotatePages(pdf, pageIndices)
+    suspend fun deletePages(pdf: PdfEntity, pageIndices: List<Int>) = pdfEditController.deletePages(pdf, pageIndices)
+    suspend fun insertBlankPage(pdf: PdfEntity, afterPageIndex: Int) = pdfEditController.insertBlankPage(pdf, afterPageIndex)
+    suspend fun extractPages(pdf: PdfEntity, pageIndices: List<Int>) = pdfEditController.extractPages(pdf, pageIndices)
 
     fun getPdfPageCount(): Int {
         return renderEngine.getPageCount()
@@ -939,7 +486,7 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         // Run synchronously to ensure it closes before the process dies
         renderEngine.closeDocument()
         try {
-            mediaRecorder?.release()
+            voiceRecordingController.stopVoiceRecording {}
         } catch (e: Exception) {}
     }
 }
