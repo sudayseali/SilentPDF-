@@ -81,18 +81,51 @@ object PdfCreator {
 
     suspend fun createImagesPdf(context: Context, imageUris: List<Uri>, title: String): Uri? = withContext(Dispatchers.IO) {
         val document = PdfDocument()
-        
+        val a4Width = 595
+        val a4Height = 842
+        val margin = 20f
+
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+
         for ((index, uri) in imageUris.withIndex()) {
             try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
+                // Decode bounds first to prevent huge memory spikes
+                var inSample = 1
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeStream(stream, null, options)
+                    val maxDim = maxOf(options.outWidth, options.outHeight)
+                    while (maxDim / inSample > 2400) {
+                        inSample *= 2
+                    }
+                }
+
+                val decodeOptions = BitmapFactory.Options().apply {
+                    inSampleSize = inSample
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                }
+
+                val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                    BitmapFactory.decodeStream(stream, null, decodeOptions)
+                }
 
                 if (bitmap != null) {
-                    val pageInfo = PdfDocument.PageInfo.Builder(bitmap.width, bitmap.height, index + 1).create()
+                    val pageInfo = PdfDocument.PageInfo.Builder(a4Width, a4Height, index + 1).create()
                     val page = document.startPage(pageInfo)
                     val canvas = page.canvas
-                    canvas.drawBitmap(bitmap, 0f, 0f, Paint())
+
+                    // Calculate aspect-fit within A4 margins
+                    val maxW = a4Width - (2 * margin)
+                    val maxH = a4Height - (2 * margin)
+                    val scale = minOf(maxW / bitmap.width.toFloat(), maxH / bitmap.height.toFloat())
+                    val destW = bitmap.width * scale
+                    val destH = bitmap.height * scale
+                    val destX = margin + (maxW - destW) / 2f
+                    val destY = margin + (maxH - destH) / 2f
+
+                    val destRect = android.graphics.RectF(destX, destY, destX + destW, destY + destH)
+                    canvas.drawBitmap(bitmap, null, destRect, paint)
+
                     document.finishPage(page)
                     bitmap.recycle()
                 }
@@ -102,13 +135,19 @@ object PdfCreator {
         }
 
         try {
-            val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "${title.replace(" ", "_")}.pdf")
-            document.writeTo(FileOutputStream(file))
+            val safeName = title.trim().replace(" ", "_").let {
+                if (it.endsWith(".pdf", ignoreCase = true)) it else "$it.pdf"
+            }
+            val docsFolder = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: context.filesDir
+            val file = File(docsFolder, safeName)
+            FileOutputStream(file).use { out ->
+                document.writeTo(out)
+            }
             document.close()
             return@withContext Uri.fromFile(file)
         } catch (e: Exception) {
             e.printStackTrace()
-            document.close()
+            try { document.close() } catch (ignored: Exception) {}
             return@withContext null
         }
     }

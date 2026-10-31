@@ -43,3 +43,12 @@ data class OcrResultEntity(
     val boundingBoxesJson: String,
     val timestamp: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "drawings", primaryKeys = ["pdfUriString", "pageNumber"])
+data class DrawingEntity(
+    val pdfUriString: String,
+    val pageNumber: Int,
+    val strokesJson: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+

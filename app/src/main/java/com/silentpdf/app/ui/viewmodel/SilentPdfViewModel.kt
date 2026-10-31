@@ -24,6 +24,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 
 data class DrawingStroke(
     val points: List<Offset>,
@@ -93,13 +95,17 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
         bitmap: Bitmap?,
         textColor: Color = Color.Unspecified
     ): ProcessedBionicPage {
+        val ocrProvider: suspend () -> String = {
+            if (bitmap != null) ocrEngine.extractText(pdfUri, pageIndex) { bitmap } else ""
+        }
         return BionicReadingEngine.processPage(
             pdfUri = pdfUri,
             pageIndex = pageIndex,
             rawText = rawText,
             bitmap = bitmap,
             config = bionicConfig.value,
-            textColor = textColor
+            textColor = textColor,
+            ocrProvider = ocrProvider
         )
     }
 
@@ -154,7 +160,24 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _currentPageBitmap = MutableStateFlow<Bitmap?>(null)
     val currentPageBitmap: StateFlow<Bitmap?> = _currentPageBitmap
 
-    private val drawingController = com.silentpdf.app.ui.viewmodel.controllers.DrawingController()
+    private val drawingController = com.silentpdf.app.ui.viewmodel.controllers.DrawingController(
+        onStrokeChanged = { pdfUri, page, strokes ->
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val json = com.silentpdf.app.util.DrawingSerializer.serializeStrokes(strokes)
+                    database.pdfDao().insertOrUpdateDrawing(
+                        com.silentpdf.app.data.db.DrawingEntity(
+                            pdfUriString = pdfUri,
+                            pageNumber = page,
+                            strokesJson = json
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e("SilentPdfViewModel", "Failed to persist drawing strokes", e)
+                }
+            }
+        }
+    )
     val pageDrawings: StateFlow<Map<String, Map<Int, List<DrawingStroke>>>> = drawingController.pageDrawings
 
     fun addStroke(pdfUri: String, page: Int, stroke: DrawingStroke) {
@@ -331,6 +354,21 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
                 
                 // Cache plain text pages for AI capabilities and high-speed search
                 cachePdfText(Uri.parse(pdf.uriString))
+
+                // Load persisted drawings for this PDF
+                try {
+                    val savedDrawings = database.pdfDao().getDrawingsForPdf(pdf.uriString)
+                    val map = mutableMapOf<Int, List<DrawingStroke>>()
+                    for (d in savedDrawings) {
+                        val strokes = com.silentpdf.app.util.DrawingSerializer.deserializeStrokes(d.strokesJson)
+                        if (strokes.isNotEmpty()) {
+                            map[d.pageNumber] = strokes
+                        }
+                    }
+                    drawingController.setLoadedDrawings(pdf.uriString, map)
+                } catch (e: Exception) {
+                    Log.e("SilentPdfViewModel", "Failed to load saved drawings", e)
+                }
             } catch (e: SecurityException) {
                 Log.e("SilentPdfViewModel", "Encrypted PDF file requiring password", e)
                 _isPasswordProtected.value = true
@@ -476,6 +514,26 @@ class SilentPdfViewModel(application: Application) : AndroidViewModel(applicatio
     suspend fun deletePages(pdf: PdfEntity, pageIndices: List<Int>) = pdfEditController.deletePages(pdf, pageIndices)
     suspend fun insertBlankPage(pdf: PdfEntity, afterPageIndex: Int) = pdfEditController.insertBlankPage(pdf, afterPageIndex)
     suspend fun extractPages(pdf: PdfEntity, pageIndices: List<Int>) = pdfEditController.extractPages(pdf, pageIndices)
+
+    fun exportPdfWithDrawings(pdf: PdfEntity, onReady: (Uri) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val drawings = pageDrawings.value[pdf.uriString] ?: emptyMap()
+            if (drawings.any { it.value.isNotEmpty() }) {
+                val docsFolder = File(getApplication<Application>().cacheDir, "shared_annotated").apply { if (!exists()) mkdirs() }
+                val destFile = File(docsFolder, "${pdf.fileName.substringBeforeLast(".")}_annotated.pdf")
+                val success = pdfEditController.burnDrawingsIntoPdf(pdf, drawings, destFile)
+                if (success && destFile.exists()) {
+                    withContext(Dispatchers.Main) {
+                        onReady(Uri.fromFile(destFile))
+                    }
+                    return@launch
+                }
+            }
+            withContext(Dispatchers.Main) {
+                onReady(Uri.parse(pdf.uriString))
+            }
+        }
+    }
 
     fun getPdfPageCount(): Int {
         return renderEngine.getPageCount()

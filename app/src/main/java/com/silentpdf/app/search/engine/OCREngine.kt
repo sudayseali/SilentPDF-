@@ -72,6 +72,50 @@ class OCREngine(private val dao: SilentPdfDao) {
         }
     }
 
+    suspend fun extractText(pdfUriString: String, pageIndex: Int, bitmapProvider: suspend () -> Bitmap?): String = withContext(Dispatchers.IO) {
+        val cached = dao.getOcrResult(pdfUriString, pageIndex)
+        if (cached != null) {
+            return@withContext cached.recognizedText
+        }
+        val bitmap = bitmapProvider() ?: return@withContext ""
+        val image = InputImage.fromBitmap(bitmap, 0)
+        try {
+            val visionText = recognizer.process(image).await()
+            val words = mutableListOf<Pair<String, RectF>>()
+            val w = bitmap.width.toFloat()
+            val h = bitmap.height.toFloat()
+            for (block in visionText.textBlocks) {
+                for (line in block.lines) {
+                    for (element in line.elements) {
+                        val box = element.boundingBox
+                        if (box != null && w > 0 && h > 0) {
+                            val normRect = RectF(
+                                max(0f, box.left.toFloat() / w),
+                                max(0f, box.top.toFloat() / h),
+                                min(1f, box.right.toFloat() / w),
+                                min(1f, box.bottom.toFloat() / h)
+                            )
+                            words.add(Pair(element.text.trim(), normRect))
+                        }
+                    }
+                }
+            }
+            val json = serializeBounds(words)
+            dao.insertOcrResult(OcrResultEntity(
+                pdfUriString = pdfUriString,
+                pageNumber = pageIndex,
+                recognizedText = visionText.text,
+                boundingBoxesJson = json
+            ))
+            return@withContext visionText.text
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return@withContext ""
+        }
+    }
+
     private fun serializeBounds(words: List<Pair<String, RectF>>): String {
         val array = JSONArray()
         for (w in words) {

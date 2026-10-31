@@ -42,25 +42,14 @@ fun ManagePagesScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedPages by remember { mutableStateOf(setOf<Int>()) }
-    var pageBitmaps by remember { mutableStateOf<Map<Int, Bitmap>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(false) }
     var totalPages by remember { mutableStateOf(0) }
 
-    // Load thumbnails
+    // Load total page count lazily without preloading all bitmaps into memory
     LaunchedEffect(pdf) {
         isLoading = true
         withContext(Dispatchers.IO) {
-            val count = viewModel.getPdfPageCount()
-            totalPages = count
-            val bitmaps = mutableMapOf<Int, Bitmap>()
-            for (i in 0 until count) {
-                // Generate a small thumbnail (e.g. 400px wide)
-                val bitmap = viewModel.getPageBitmap(i, 400)
-                if (bitmap != null) {
-                    bitmaps[i] = bitmap
-                }
-            }
-            pageBitmaps = bitmaps
+            totalPages = viewModel.getPdfPageCount()
         }
         isLoading = false
     }
@@ -258,22 +247,11 @@ fun ManagePagesScreen(
                                     }
                                 }
                         ) {
-                            val bitmap = pageBitmaps[index]
-                            if (bitmap != null) {
-                                Image(
-                                    bitmap = bitmap.asImageBitmap(),
-                                    contentDescription = "Page ${index + 1}",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                                }
-                            }
+                            ManagePageThumbnail(
+                                pageIndex = index,
+                                viewModel = viewModel,
+                                modifier = Modifier.fillMaxSize()
+                            )
                             
                             // Checkbox top right
                             Box(
@@ -333,5 +311,32 @@ fun ManageBottomAction(icon: androidx.compose.ui.graphics.vector.ImageVector, la
         Icon(icon, contentDescription = label, tint = MaterialTheme.colorScheme.onSurface)
         Spacer(modifier = Modifier.height(4.dp))
         Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+@Composable
+private fun ManagePageThumbnail(
+    pageIndex: Int,
+    viewModel: SilentPdfViewModel,
+    modifier: Modifier = Modifier
+) {
+    var bitmap by remember(pageIndex) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(pageIndex) {
+        bitmap = viewModel.getPageBitmap(pageIndex, 360)
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = "Page ${pageIndex + 1}",
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = modifier,
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        }
     }
 }

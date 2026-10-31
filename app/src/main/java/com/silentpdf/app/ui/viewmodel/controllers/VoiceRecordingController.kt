@@ -26,7 +26,8 @@ class VoiceRecordingController(private val context: Context, private val corouti
     fun startVoiceRecording() {
         if (_isRecording.value) return
         try {
-            val file = File(context.cacheDir, "audio_note_${System.currentTimeMillis()}.m4a")
+            val voiceDir = File(context.filesDir, "voice_notes").apply { if (!exists()) mkdirs() }
+            val file = File(voiceDir, "audio_note_${System.currentTimeMillis()}.m4a")
             recordingFile = file
             
             val attributionContext = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {

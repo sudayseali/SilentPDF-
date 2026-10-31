@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import android.net.Uri
 import android.util.Log
-import com.silentpdf.app.bionic.OCRProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -140,7 +139,11 @@ class PdfTextSearcher(private val context: Context) {
         }
     }
 
-    suspend fun getPagesText(uri: Uri, bitmapProvider: (suspend (Int) -> Bitmap?)? = null): List<String> = withContext(Dispatchers.IO) {
+    suspend fun getPagesText(
+        uri: Uri,
+        bitmapProvider: (suspend (Int) -> Bitmap?)? = null,
+        ocrProvider: (suspend (Int, Bitmap) -> String)? = null
+    ): List<String> = withContext(Dispatchers.IO) {
         val pagesText = mutableListOf<String>()
         try {
             context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
@@ -153,11 +156,10 @@ class PdfTextSearcher(private val context: Context) {
                     var text = stripper.getText(document).trim()
 
                     // OCR Fallback for scanned/empty text pages
-                    if (text.isBlank() && bitmapProvider != null) {
+                    if (text.isBlank() && bitmapProvider != null && ocrProvider != null) {
                         val bitmap = bitmapProvider(i - 1)
                         if (bitmap != null) {
-                            val ocrRes = OCRProcessor.recognizeTextWithBounds(bitmap)
-                            text = ocrRes.text.trim()
+                            text = ocrProvider(i - 1, bitmap)
                         }
                     }
 
@@ -174,7 +176,8 @@ class PdfTextSearcher(private val context: Context) {
     suspend fun search(
         uri: Uri,
         query: String,
-        bitmapProvider: (suspend (Int) -> Bitmap?)? = null
+        bitmapProvider: (suspend (Int) -> Bitmap?)? = null,
+        ocrBoundsProvider: (suspend (Int, Bitmap) -> List<Pair<String, RectF>>)? = null
     ): List<SearchResult> = withContext(Dispatchers.IO) {
         val results = mutableListOf<SearchResult>()
         if (query.isBlank()) return@withContext results
@@ -204,11 +207,10 @@ class PdfTextSearcher(private val context: Context) {
                     var words = stripper.wordBounds
 
                     // OCR Fallback if page text/word bounds are empty
-                    if (words.isEmpty() && bitmapProvider != null) {
+                    if (words.isEmpty() && bitmapProvider != null && ocrBoundsProvider != null) {
                         val bitmap = bitmapProvider(i - 1)
                         if (bitmap != null) {
-                            val ocrRes = OCRProcessor.recognizeTextWithBounds(bitmap)
-                            words = ocrRes.wordBounds.toMutableList()
+                            words = ocrBoundsProvider(i - 1, bitmap).toMutableList()
                         }
                     }
 
@@ -229,7 +231,8 @@ class PdfTextSearcher(private val context: Context) {
     suspend fun searchMatches(
         uri: Uri,
         query: String,
-        bitmapProvider: (suspend (Int) -> Bitmap?)? = null
+        bitmapProvider: (suspend (Int) -> Bitmap?)? = null,
+        ocrBoundsProvider: (suspend (Int, Bitmap) -> List<Pair<String, RectF>>)? = null
     ): List<Match> = withContext(Dispatchers.IO) {
         val matches = mutableListOf<Match>()
         if (query.isBlank()) return@withContext matches
@@ -258,11 +261,10 @@ class PdfTextSearcher(private val context: Context) {
                     stripper.getText(document)
                     var words = stripper.wordBounds
 
-                    if (words.isEmpty() && bitmapProvider != null) {
+                    if (words.isEmpty() && bitmapProvider != null && ocrBoundsProvider != null) {
                         val bitmap = bitmapProvider(i - 1)
                         if (bitmap != null) {
-                            val ocrRes = OCRProcessor.recognizeTextWithBounds(bitmap)
-                            words = ocrRes.wordBounds.toMutableList()
+                            words = ocrBoundsProvider(i - 1, bitmap).toMutableList()
                         }
                     }
 
@@ -424,7 +426,8 @@ class PdfTextSearcher(private val context: Context) {
         uri: Uri,
         pageIndex: Int,
         query: String,
-        pageBitmap: Bitmap? = null
+        pageBitmap: Bitmap? = null,
+        ocrBoundsProvider: (suspend (Int, Bitmap) -> List<Pair<String, RectF>>)? = null
     ): List<RectF> = withContext(Dispatchers.IO) {
         val bounds = mutableListOf<RectF>()
         if (query.isBlank()) return@withContext bounds
@@ -445,9 +448,8 @@ class PdfTextSearcher(private val context: Context) {
                 var words = stripper.wordBounds
 
                 // OCR Fallback if page text/word bounds are empty
-                if (words.isEmpty() && pageBitmap != null) {
-                    val ocrRes = OCRProcessor.recognizeTextWithBounds(pageBitmap)
-                    words = ocrRes.wordBounds.toMutableList()
+                if (words.isEmpty() && pageBitmap != null && ocrBoundsProvider != null) {
+                    words = ocrBoundsProvider(pageIndex, pageBitmap).toMutableList()
                 }
 
                 if (words.isNotEmpty()) {
@@ -481,9 +483,8 @@ class PdfTextSearcher(private val context: Context) {
             }
         } catch (e: Exception) {
             Log.e("PdfTextSearcher", "Error getting page bounds", e)
-            if (pageBitmap != null) {
-                val ocrRes = OCRProcessor.recognizeTextWithBounds(pageBitmap)
-                val words = ocrRes.wordBounds
+            if (pageBitmap != null && ocrBoundsProvider != null) {
+                val words = ocrBoundsProvider(pageIndex, pageBitmap)
                 if (words.isNotEmpty()) {
                     val fullTextBuilder = StringBuilder()
                     val wordPositions = mutableListOf<Int>()

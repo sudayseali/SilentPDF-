@@ -13,7 +13,8 @@ object BionicReadingEngine {
         rawText: String,
         bitmap: Bitmap? = null,
         config: BionicConfig,
-        textColor: Color = Color.Unspecified
+        textColor: Color = Color.Unspecified,
+        ocrProvider: (suspend () -> String)? = null
     ): ProcessedBionicPage = withContext(Dispatchers.Default) {
         // 1. Check LRU Cache
         val cached = CacheManager.get(pdfUri, pageIndex, config)
@@ -26,8 +27,8 @@ object BionicReadingEngine {
         var isOcrUsed = false
 
         // 2. OCR Fallback for scanned PDFs if raw text is empty
-        if (textToUse.isEmpty() && config.autoOcrForScanned && bitmap != null) {
-            textToUse = OCRProcessor.recognizeText(bitmap).trim()
+        if (textToUse.isEmpty() && config.autoOcrForScanned && ocrProvider != null) {
+            textToUse = ocrProvider().trim()
             isOcrUsed = textToUse.isNotEmpty()
         }
 

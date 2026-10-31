@@ -56,14 +56,80 @@ class PdfEditController(
         return false
     }
 
+    suspend fun burnDrawingsIntoPdf(pdf: PdfEntity, drawings: Map<Int, List<com.silentpdf.app.ui.viewmodel.DrawingStroke>>, destinationFile: File): Boolean = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        try {
+            val originalUri = Uri.parse(pdf.uriString)
+            application.contentResolver.openFileDescriptor(originalUri, "r")?.use { pfd ->
+                com.tom_roush.pdfbox.pdmodel.PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly()).use { document ->
+                    drawings.forEach { (pageIdx, strokes) ->
+                        if (pageIdx in 0 until document.numberOfPages && strokes.isNotEmpty()) {
+                            val page = document.getPage(pageIdx)
+                            val cropBox = page.cropBox ?: page.mediaBox
+                            val pdfWidth = cropBox.width
+                            val pdfHeight = cropBox.height
+
+                            val contentStream = com.tom_roush.pdfbox.pdmodel.PDPageContentStream(
+                                document, page, com.tom_roush.pdfbox.pdmodel.PDPageContentStream.AppendMode.APPEND, true, true
+                            )
+                            strokes.forEach { stroke ->
+                                if (stroke.points.size > 1 && !stroke.isEraser) {
+                                    contentStream.setStrokingColor(stroke.color.red, stroke.color.green, stroke.color.blue)
+                                    contentStream.setLineWidth(stroke.width.coerceIn(1f, 20f))
+                                    val first = stroke.points.first()
+                                    // Scale to PDF coordinate system (points bottom-left origin)
+                                    val startX = first.x.coerceIn(0f, pdfWidth)
+                                    val startY = (pdfHeight - first.y).coerceIn(0f, pdfHeight)
+                                    contentStream.moveTo(startX, startY)
+                                    for (i in 1 until stroke.points.size) {
+                                        val pt = stroke.points[i]
+                                        val x = pt.x.coerceIn(0f, pdfWidth)
+                                        val y = (pdfHeight - pt.y).coerceIn(0f, pdfHeight)
+                                        contentStream.lineTo(x, y)
+                                    }
+                                    contentStream.stroke()
+                                }
+                            }
+                            contentStream.close()
+                        }
+                    }
+                    java.io.FileOutputStream(destinationFile).use { out ->
+                        document.save(out)
+                    }
+                }
+            }
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     private suspend fun replacePdfWithTemp(pdf: PdfEntity, tempFile: File): Boolean {
         return try {
             val originalUri = Uri.parse(pdf.uriString)
+            
+            // 1. Release active file descriptor lock in render engine
+            renderEngine.closeDocument()
+
+            // 2. Atomic copy with backup
             if (originalUri.scheme == "file") {
                 val originalFile = File(originalUri.path!!)
-                tempFile.copyTo(originalFile, overwrite = true)
+                val backupFile = File(application.cacheDir, "backup_${System.currentTimeMillis()}.pdf")
+                if (originalFile.exists()) {
+                    originalFile.copyTo(backupFile, overwrite = true)
+                }
+                try {
+                    tempFile.copyTo(originalFile, overwrite = true)
+                    backupFile.delete()
+                } catch (e: Exception) {
+                    if (backupFile.exists()) {
+                        backupFile.copyTo(originalFile, overwrite = true)
+                        backupFile.delete()
+                    }
+                    throw e
+                }
             } else {
-                application.contentResolver.openOutputStream(originalUri)?.use { out ->
+                application.contentResolver.openOutputStream(originalUri, "rwt")?.use { out ->
                     FileInputStream(tempFile).use { input ->
                         input.copyTo(out)
                     }
@@ -82,6 +148,11 @@ class PdfEditController(
             true
         } catch (e: Exception) {
             e.printStackTrace()
+            try {
+                renderEngine.openDocument(Uri.parse(pdf.uriString))
+            } catch (ex: Exception) {
+                // ignore
+            }
             false
         }
     }

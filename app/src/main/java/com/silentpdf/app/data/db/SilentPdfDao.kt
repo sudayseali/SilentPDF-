@@ -76,4 +76,20 @@ interface SilentPdfDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOcrResult(ocrResult: OcrResultEntity)
+
+    // Drawings queries
+    @Query("SELECT * FROM drawings WHERE pdfUriString = :pdfUriString")
+    suspend fun getDrawingsForPdf(pdfUriString: String): List<DrawingEntity>
+
+    @Query("SELECT * FROM drawings WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber LIMIT 1")
+    suspend fun getDrawingForPage(pdfUriString: String, pageNumber: Int): DrawingEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateDrawing(drawing: DrawingEntity)
+
+    @Query("DELETE FROM drawings WHERE pdfUriString = :pdfUriString AND pageNumber = :pageNumber")
+    suspend fun deleteDrawingForPage(pdfUriString: String, pageNumber: Int)
+
+    @Query("DELETE FROM drawings WHERE pdfUriString = :pdfUriString")
+    suspend fun deleteDrawingsForPdf(pdfUriString: String)
 }

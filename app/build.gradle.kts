@@ -23,14 +23,14 @@ android {
 
     signingConfigs {
         create("release") {
-            val ksFile = rootProject.file("silentpdf.keystore")
-            if (ksFile.exists() && ksFile.length() > 0) {
+            val ksPath = System.getenv("RELEASE_KEYSTORE_PATH") ?: (project.findProperty("RELEASE_KEYSTORE_PATH") as String?) ?: "release.keystore"
+            val ksFile = rootProject.file(ksPath)
+            
+            if (ksFile.exists()) {
                 storeFile = ksFile
-                storePassword = "silentpdf2024"
-                keyAlias = "silentpdf"
-                keyPassword = "silentpdf2024"
-            } else {
-                initWith(getByName("debug"))
+                storePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD") ?: (project.findProperty("RELEASE_KEYSTORE_PASSWORD") as String?)
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: (project.findProperty("RELEASE_KEY_ALIAS") as String?)
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: (project.findProperty("RELEASE_KEY_PASSWORD") as String?)
             }
         }
     }

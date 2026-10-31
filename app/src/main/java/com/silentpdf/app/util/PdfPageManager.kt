@@ -64,7 +64,11 @@ object PdfPageManager {
                 PDDocument.load(FileInputStream(pfd.fileDescriptor), com.tom_roush.pdfbox.io.MemoryUsageSetting.setupTempFileOnly()).use { document ->
                     val newPage = PDPage(PDRectangle.A4)
                     val indexToInsert = (afterPageIndex + 1).coerceIn(0, document.numberOfPages)
-                    document.pages.insertBefore(newPage, if (indexToInsert < document.numberOfPages) document.getPage(indexToInsert) else null)
+                    if (indexToInsert >= document.numberOfPages) {
+                        document.addPage(newPage)
+                    } else {
+                        document.pages.insertBefore(newPage, document.getPage(indexToInsert))
+                    }
                     
                     FileOutputStream(destinationFile).use { out ->
                         document.save(out)

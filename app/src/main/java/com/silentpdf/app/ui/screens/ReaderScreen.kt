@@ -1328,14 +1328,15 @@ fun ReaderScreen(
                                     Column(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         modifier = Modifier.clickable {
-                                            currentPdf?.uriString?.let { uriString ->
-                                                val uri = android.net.Uri.parse(uriString)
-                                                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                                    type = "application/pdf"
-                                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                            currentPdf?.let { pdf ->
+                                                viewModel.exportPdfWithDrawings(pdf) { exportUri ->
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                        type = "application/pdf"
+                                                        putExtra(android.content.Intent.EXTRA_STREAM, exportUri)
+                                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    }
+                                                    context.startActivity(android.content.Intent.createChooser(intent, "Share PDF"))
                                                 }
-                                                context.startActivity(android.content.Intent.createChooser(intent, "Share PDF"))
                                             }
                                         }.padding(8.dp)
                                     ) {

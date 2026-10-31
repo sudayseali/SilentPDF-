@@ -6,11 +6,19 @@ import com.silentpdf.app.ui.viewmodel.DrawingStroke
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class DrawingController {
+class DrawingController(
+    private val onStrokeChanged: ((pdfUri: String, page: Int, strokes: List<DrawingStroke>) -> Unit)? = null
+) {
     private val _pageDrawings = MutableStateFlow<Map<String, Map<Int, List<DrawingStroke>>>>(emptyMap())
     val pageDrawings: StateFlow<Map<String, Map<Int, List<DrawingStroke>>>> = _pageDrawings
 
     private val _redoStack = MutableStateFlow<List<Pair<Pair<String, Int>, DrawingStroke>>>(emptyList())
+
+    fun setLoadedDrawings(pdfUri: String, drawingsMap: Map<Int, List<DrawingStroke>>) {
+        val currentDrawings = _pageDrawings.value.toMutableMap()
+        currentDrawings[pdfUri] = drawingsMap
+        _pageDrawings.value = currentDrawings
+    }
 
     fun addStroke(pdfUri: String, page: Int, stroke: DrawingStroke) {
         val currentDrawings = _pageDrawings.value.toMutableMap()
@@ -21,6 +29,7 @@ class DrawingController {
         currentDrawings[pdfUri] = pdfDrawings
         _pageDrawings.value = currentDrawings
         _redoStack.value = emptyList() // clear redo stack on new action
+        onStrokeChanged?.invoke(pdfUri, page, pageStrokes)
     }
 
     fun undoLastStroke(pdfUri: String, page: Int) {
@@ -33,6 +42,7 @@ class DrawingController {
             currentDrawings[pdfUri] = pdfDrawings
             _pageDrawings.value = currentDrawings
             _redoStack.value = _redoStack.value + Pair(Pair(pdfUri, page), removedStroke)
+            onStrokeChanged?.invoke(pdfUri, page, pageStrokes)
         }
     }
 
@@ -50,6 +60,7 @@ class DrawingController {
             pdfDrawings[page] = pageStrokes
             currentDrawings[pdfUri] = pdfDrawings
             _pageDrawings.value = currentDrawings
+            onStrokeChanged?.invoke(pdfUri, page, pageStrokes)
         }
     }
 }
